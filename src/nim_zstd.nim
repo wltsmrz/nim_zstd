@@ -3,7 +3,7 @@
 
 import bindings/zstd
 
-proc compress*(src: openArray[byte], lvl: int): seq[byte] =
+proc compress*(src: openArray[byte], lvl: int = 3): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
   let dst_cap = ZSTD_compressBound(src_cap)
