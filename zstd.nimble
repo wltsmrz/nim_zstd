@@ -7,3 +7,9 @@ skipFiles = @["README.md"]
 installDirs = @["zstd"]
 installFiles = @["zstd.nim"]
 requires "nim >= 1.2.0"
+
+when defined(nimdistros):
+  import distros
+  if detectOs(Ubuntu):
+    foreignDep "libzstd-dev"
+
