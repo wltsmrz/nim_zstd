@@ -1,4 +1,4 @@
-version = "0.1.0"
+version = "0.2.0"
 author = "wltsmrz"
 description = "Nim bindings for zstd"
 license = "MIT"
@@ -8,8 +8,7 @@ installDirs = @["zstd"]
 installFiles = @["zstd.nim"]
 requires "nim >= 1.2.0"
 
-when defined(nimdistros):
-  import distros
-  if detectOs(Ubuntu):
-    foreignDep "libzstd-dev"
+before install:
+  exec("git submodule update --init --depth 1")
+  exec("make -j$(nproc) -C zstd/deps/zstd lib-release")
 
