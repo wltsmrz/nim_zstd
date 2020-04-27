@@ -1,8 +1,22 @@
-# {.passC: "-I/usr/include".}
-{.passL: "-lzstd".}
-
+import std/os
+import std/strutils
 import std/streams
-import zstd/bindings
+
+let cur_src_path {.compileTime.} = currentSourcePath.rsplit(DirSep, 1)[0]
+let dep_dir {.compileTime.} = joinPath(cur_src_path, "zstd/deps/zstd")
+let dep_lib_dir {.compileTime.} = joinPath(dep_dir, "lib")
+let dep_incl_dir {.compileTime.} = joinPath(dep_dir, "lib")
+let dep_lib_name {.compileTime.} = "zstd"
+let dep_header_name {.compileTime.} = "zstd.h"
+
+{.passC: "-I" & dep_incl_dir.}
+{.passL: "-L" & dep_lib_dir & " -l" & dep_lib_name.}
+
+{.pragma: c_dep_type, header: dep_header_name, bycopy.}
+{.pragma: c_dep_proc, importc, header: dep_header_name, cdecl.}
+{.pragma: c_dep_enum, size: sizeof(cint).}
+
+include zstd/bindings
 
 proc bytes*(s: string): seq[byte] =
   result = newSeqOfCap[byte](s.len)
