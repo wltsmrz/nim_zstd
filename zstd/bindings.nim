@@ -1,3 +1,19 @@
+import std/os
+import std/strutils
+
+let cur_src_path {.compileTime.} = currentSourcePath.rsplit(DirSep, 1)[0]
+let dep_dir {.compileTime.} = joinPath(cur_src_path, "deps/zstd")
+let dep_lib_dir {.compileTime.} = joinPath(dep_dir, "lib")
+let dep_incl_dir {.compileTime.} = joinPath(dep_dir, "lib")
+let dep_lib_name {.compileTime.} = "zstd"
+let dep_header_name {.compileTime.} = "zstd.h"
+
+{.passC: "-I" & dep_incl_dir.}
+{.passL: "-L" & dep_lib_dir & " -l" & dep_lib_name.}
+
+{.pragma: c_dep_type, header: dep_header_name, bycopy.}
+{.pragma: c_dep_proc, importc, header: dep_header_name, cdecl.}
+{.pragma: c_dep_enum, size: sizeof(cint).}
 
 const ZSTD_CONTENTSIZE_UNKNOWN* = clonglong(-1)
 const ZSTD_CONTENTSIZE_ERROR* = clonglong(-2)
@@ -47,26 +63,26 @@ proc ZSTD_createDDict*(a: ptr byte, b: csize_t): ptr ZSTD_DDict {.c_dep_proc.}
 proc ZSTD_freeDDict*(a: ptr ZSTD_DDict): csize_t {.c_dep_proc.}
 proc ZSTD_decompressUsingDDict*(a: ptr ZSTD_CCtx, b: ptr byte, c: csize_t, d: ptr byte, e: csize_t, f: ptr ZSTD_DDict): csize_t {.c_dep_proc.}
 
-type ZSTD_inBuffer* {.importc: "ZSTD_inBuffer", header: "zstd.h".} = object
-  src*: ptr byte
-  size*: csize_t
-  pos*: csize_t
+type ZSTD_inBuffer* {.c_dep_type.} = object
+  src* {.importc.}: ptr byte
+  size* {.importc.}: csize_t
+  pos* {.importc.}: csize_t
 
-type ZSTD_outBuffer* {.importc: "ZSTD_outBuffer", header: "zstd.h".} = object
-  dst*: ptr byte
-  size*: csize_t
-  pos*: csize_t
+type ZSTD_outBuffer* {.c_dep_type.} = object
+  dst* {.importc.}: ptr byte
+  size* {.importc.}: csize_t
+  pos* {.importc.}: csize_t
 
-type ZSTD_CStream* {.importc: "ZSTD_CStream", header: "zstd.h".} = object
+type ZSTD_CStream* {.c_dep_type.} = object
 
-proc ZSTD_createCStream*(): ptr ZSTD_CStream {.importc: "ZSTD_createCStream", header: "zstd.h".}
-proc ZSTD_freeCStream*(a: ptr ZSTD_CStream): csize_t {.importc: "ZSTD_freeCStream", header: "zstd.h".}
-proc ZSTD_CStreamInSize*(): csize_t {.importc: "ZSTD_CStreamInSize", header: "zstd.h".}
-proc ZSTD_CStreamOutSize*(): csize_t {.importc: "ZSTD_CStreamOutSize", header: "zstd.h".}
-proc ZSTD_initCStream*(a: ptr ZSTD_CStream, b: cint): csize_t {.importc: "ZSTD_initCStream", header: "zstd.h".}
-proc ZSTD_compressStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer, c: ptr ZSTD_inBuffer): csize_t {.importc: "ZSTD_compressStream", header: "zstd.h".}
-proc ZSTD_flushStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer): csize_t {.importc: "ZSTD_flushStream", header: "zstd.h".}
-proc ZSTD_endStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer): csize_t {.importc: "ZSTD_endStream", header: "zstd.h".}
+proc ZSTD_createCStream*(): ptr ZSTD_CStream {.c_dep_proc.}
+proc ZSTD_freeCStream*(a: ptr ZSTD_CStream): csize_t {.c_dep_proc.}
+proc ZSTD_CStreamInSize*(): csize_t {.c_dep_proc.}
+proc ZSTD_CStreamOutSize*(): csize_t {.c_dep_proc.}
+proc ZSTD_initCStream*(a: ptr ZSTD_CStream, b: cint): csize_t {.c_dep_proc.}
+proc ZSTD_compressStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer, c: ptr ZSTD_inBuffer): csize_t {.c_dep_proc.}
+proc ZSTD_flushStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer): csize_t {.c_dep_proc.}
+proc ZSTD_endStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer): csize_t {.c_dep_proc.}
 
 type ZSTD_DStream* {.c_dep_type.} = object
 proc ZSTD_createDStream*(): ptr ZSTD_DStream {.c_dep_proc.}
