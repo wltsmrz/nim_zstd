@@ -5,27 +5,40 @@ import ../zstd
 
 test "Simple":
   var source = bytes(readFile("tests/files/nixon.bmp"))
-  var compressed = compress(source, 3)
+  var compressed = compress(source, level=3)
   var decompressed = decompress(compressed)
+  var compressed_s = compress(readFile("tests/files/nixon.bmp"), level=3)
+  var decompressed_s = decompress(readFile("tests/files/nixon.zst"))
   check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  check equalmem(compressed_s[0].addr, compressed[0].addr, compressed.len)
+  check equalmem(decompressed_s[0].addr, decompressed[0].addr, decompressed.len)
 
 test "Simple - default compression level":
   var source = bytes(readFile("tests/files/nixon.bmp"))
   var compressed = compress(source)
   var decompressed = decompress(compressed)
+  var compressed_s = compress(readFile("tests/files/nixon.bmp"))
+  var decompressed_s = decompress(readFile("tests/files/nixon.zst"))
   check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  check equalmem(compressed_s[0].addr, compressed[0].addr, compressed.len)
+  check equalmem(decompressed_s[0].addr, decompressed[0].addr, decompressed.len)
 
 test "With context":
   var source = bytes(readFile("tests/files/nixon.bmp"))
 
   var cctx = new_compress_context()
   var compressed = compress(cctx, source, level=3)
+  var compressed_s = compress(cctx, readFile("tests/files/nixon.bmp"), level=3)
   discard free_context(cctx)
 
   var dctx = new_decompress_context()
   var decompressed = decompress(dctx, compressed)
-  check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  var decompressed_s = decompress(dctx, readFile("tests/files/nixon.zst"))
   discard free_context(dctx)
+
+  check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  check equalmem(compressed_s[0].addr, compressed[0].addr, compressed.len)
+  check equalmem(decompressed_s[0].addr, decompressed[0].addr, decompressed.len)
 
 test "With dict":
   var source = bytes(readFile("tests/files/nixon.bmp"))
@@ -33,12 +46,17 @@ test "With dict":
 
   var cctx = new_compress_context()
   var compressed = compress(cctx, source, dict, level=3)
+  var compressed_s = compress(cctx, readFile("tests/files/nixon.bmp"), dict, level=3)
   discard free_context(cctx)
 
   var dctx = new_decompress_context()
   var decompressed = decompress(dctx, compressed, dict)
-  check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  var decompressed_s = decompress(dctx, readFile("tests/files/nixon.zst"), dict)
   discard free_context(dctx)
+
+  check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  check equalmem(compressed_s[0].addr, compressed[0].addr, compressed.len)
+  check equalmem(decompressed_s[0].addr, decompressed[0].addr, decompressed.len)
 
 test "Stream":
   removeFile("tests/files/nixon-copy.bmp")

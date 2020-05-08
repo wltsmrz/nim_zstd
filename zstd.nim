@@ -24,7 +24,7 @@ proc free_compress_stream*(strm: ptr ZSTD_CStream): csize_t =
 proc free_decompress_stream*(strm: ptr ZSTD_DStream): csize_t =
   ZSTD_freeDStream(strm)
 
-proc compress*(src: openArray[byte], level: int = 3): seq[byte] =
+proc compress*(src: sink openArray[byte], level: int = 3): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
   let dst_cap = ZSTD_compressBound(src_cap)
@@ -35,7 +35,7 @@ proc compress*(src: openArray[byte], level: int = 3): seq[byte] =
   dst_buf.setLen(res)
   return dst_buf
 
-proc decompress*(src: openArray[byte]): seq[byte] =
+proc decompress*(src: sink openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
   let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
@@ -51,7 +51,7 @@ proc decompress*(src: openArray[byte]): seq[byte] =
     raise newException(AssertionError, $ZSTD_getErrorName(res))
   return dst_buf
 
-proc compress*(ctx: ptr ZSTD_CCtx, src: openArray[byte], level: int = 3): seq[byte] =
+proc compress*(ctx: ptr ZSTD_CCtx, src: sink openArray[byte], level: int = 3): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
   let dst_cap = ZSTD_compressBound(src_cap)
@@ -61,8 +61,8 @@ proc compress*(ctx: ptr ZSTD_CCtx, src: openArray[byte], level: int = 3): seq[by
     raise newException(AssertionError, $ZSTD_getErrorName(res))
   dst_buf.setLen(res)
   return dst_buf
-  
-proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte]): seq[byte] =
+
+proc decompress*(ctx: ptr ZSTD_DCtx, src: sink openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
   let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
@@ -78,7 +78,7 @@ proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte]): seq[byte] =
     raise newException(AssertionError, $ZSTD_getErrorName(res))
   return dst_buf
 
-proc compress*(ctx: ptr ZSTD_CCtx, src: openArray[byte], dict: openArray[byte], level: int = 3): seq[byte] =
+proc compress*(ctx: ptr ZSTD_CCtx, src: sink openArray[byte], dict: openArray[byte], level: int = 3): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
   let dst_cap = ZSTD_compressBound(src_cap)
@@ -173,4 +173,28 @@ proc decompress*(in_stream: Stream, out_stream: Stream) =
   discard ZSTD_freeDStream(dstream)
   in_stream.close()
   out_stream.close()
+
+proc compress*(src: sink string, level: int = 3): seq[byte] {.inline.} =
+  var src_bytes = bytes(src)
+  return compress(move(src_bytes), level)
+
+proc decompress*(src: sink string): seq[byte] {.inline.} =
+  var src_bytes = bytes(src)
+  return decompress(move(src_bytes))
+
+proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, level: int = 3): seq[byte] {.inline.} =
+  var src_bytes = bytes(src)
+  return compress(ctx, move(src_bytes), level)
+
+proc decompress*(ctx: ptr ZSTD_DCtx, src: sink string): seq[byte] {.inline.} =
+  var src_bytes = bytes(src)
+  return decompress(ctx, move(src_bytes))
+
+proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, dict: openArray[byte], level: int = 3): seq[byte] {.inline.} =
+  var src_bytes = bytes(src)
+  return compress(ctx, move(src_bytes), dict, level)
+
+proc decompress*(ctx: ptr ZSTD_DCtx, src: sink string, dict: openArray[byte]): seq[byte] {.inline.} =
+  var src_bytes = bytes(src)
+  return decompress(ctx, move(src_bytes), dict)
 
