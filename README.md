@@ -13,7 +13,7 @@ $ nimble install zstd
   import zstd/decompress
 
   var source = readFile("tests/files/nixon.bmp")
-  var compressed = compress(source, 3)
+  var compressed = compress(source, level=3)
   var decompressed = decompress(compressed)
   check equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
