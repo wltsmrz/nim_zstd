@@ -1,7 +1,9 @@
 import os
 import streams
 import unittest
-import ../zstd
+import ../zstd/common
+import ../zstd/compress
+import ../zstd/decompress
 
 test "Simple":
   var source = bytes(readFile("tests/files/nixon.bmp"))
