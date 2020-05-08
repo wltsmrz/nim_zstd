@@ -32,7 +32,8 @@ proc compress*(src: openArray[byte], level: int = 3): seq[byte] =
   let res: uint = ZSTD_compress(addr(dst_buf[0]), dst_cap, src_ptr, src_cap, level.cint)
   if ZSTD_isError(res):
     raise newException(AssertionError, $ZSTD_getErrorName(res))
-  return dst_buf[0 ..< res]
+  dst_buf.setLen(res)
+  return dst_buf
 
 proc decompress*(src: openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
@@ -58,7 +59,8 @@ proc compress*(ctx: ptr ZSTD_CCtx, src: openArray[byte], level: int = 3): seq[by
   let res: uint = ZSTD_compressCCtx(ctx, addr(dst_buf[0]), dst_cap, src_ptr, src_cap, level.cint)
   if ZSTD_isError(res):
     raise newException(AssertionError, $ZSTD_getErrorName(res))
-  return dst_buf[0 ..< res]
+  dst_buf.setLen(res)
+  return dst_buf
   
 proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
@@ -84,7 +86,8 @@ proc compress*(ctx: ptr ZSTD_CCtx, src: openArray[byte], dict: openArray[byte], 
   let res: uint = ZSTD_compress_usingDict(ctx, addr(dst_buf[0]), dst_cap, src_ptr, src_cap, unsafeAddr(dict[0]), cast[csize_t](dict.len), level.cint)
   if ZSTD_isError(res):
     raise newException(AssertionError, $ZSTD_getErrorName(res))
-  return dst_buf[0 ..< res]
+  dst_buf.setLen(res)
+  return dst_buf
   
 proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte], dict: openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
