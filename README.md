@@ -1,4 +1,3 @@
-
 # zstd
 
 Nim bindings for [zstd](https://github.com/facebook/zstd)
@@ -7,14 +6,13 @@ Nim bindings for [zstd](https://github.com/facebook/zstd)
 $ nimble install zstd
 ```
 
-## Requirements
-
-`lib-zstd` is required. On Ubuntu, `sudo apt-get install libzstd-dev`
-
 ## Simple API
 
 ```nim
-  var source = bytes(readFile("tests/files/nixon.bmp"))
+  import zstd/compress
+  import zstd/decompress
+
+  var source = readFile("tests/files/nixon.bmp")
   var compressed = compress(source, 3)
   var decompressed = decompress(compressed)
   check equalmem(decompressed[0].addr, source[0].addr, source.len)
@@ -35,7 +33,10 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
 
 
 ```nim
-  var source = bytes(readFile("tests/files/nixon.bmp"))
+  import zstd/compress
+  import zstd/decompress
+
+  var source = readFile("tests/files/nixon.bmp")
 
   var cctx = new_compress_context()
   var compressed = compress(cctx, source, level=3)
@@ -43,13 +44,18 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
 
   var dctx = new_decompress_context()
   var decompressed = decompress(dctx, compressed)
-  check equalmem(decompressed[0].addr, source[0].addr, source.len)
   discard free_context(dctx)
+
+  check equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
 
 **With dictionary**
 
 ```nim
+  import zstd/common # for bytes()
+  import zstd/compress
+  import zstd/decompress
+
   var source = bytes(readFile("tests/files/nixon.bmp"))
   var dict = bytes(readFile("tests/files/nixon.dict"))
 
@@ -59,13 +65,12 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
 
   var dctx = new_decompress_context()
   var decompressed = decompress(dctx, compressed, dict)
-  check equalmem(decompressed[0].addr, source[0].addr, source.len)
   discard free_context(dctx)
+
+  check equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
 
 ## Streaming
-
-This library has bindings for libzstd v1.3.3--the most recent available in Ubuntu 18.04 default apt repositories AFAIK. It's still kind of old. This version lacks `streamCompress2`, so the streaming support in this library was a bit harder to implement and is probably inferior to libzstd v1.4 binding. Likely in the future libzstd will be bundled.
 
 ```nim
   var c_in_stream = newFileStream("tests/files/nixon.bmp", fmRead)
@@ -85,4 +90,10 @@ This library has bindings for libzstd v1.3.3--the most recent available in Ubunt
 
   check equalmem(cycled[0].addr, original[0].addr, original.len)
 ```
+
+# Compile flags
+
+`-d:useExternalZstd` to skip compiling with zstd and use system zstd instead (not default behavior)
+
+`-d:zstdPath=/home/zstd` specify path to custom zstd
 
