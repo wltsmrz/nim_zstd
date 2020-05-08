@@ -9,5 +9,4 @@ requires "nim >= 1.2.0"
 
 before install:
   exec("git submodule update --init --depth 1")
-  exec("make -j$(nproc) -C zstd/deps/zstd lib-release")
 

@@ -2,11 +2,12 @@ import std/os
 import std/streams
 import ./common
 
-{.passC: "-I" & joinPath(dep_lib_dir, "decompress").}
-{.compile: joinPath(dep_lib_dir, "decompress/huf_decompress.c").}
-{.compile: joinPath(dep_lib_dir, "decompress/zstd_ddict.c").}
-{.compile: joinPath(dep_lib_dir, "decompress/zstd_decompress_block.c").}
-{.compile: joinPath(dep_lib_dir, "decompress/zstd_decompress.c").}
+when not defined(useExternalZstd):
+  {.passC: "-I" & joinPath(dep_lib_dir, "decompress").}
+  {.compile: joinPath(dep_lib_dir, "decompress/huf_decompress.c").}
+  {.compile: joinPath(dep_lib_dir, "decompress/zstd_ddict.c").}
+  {.compile: joinPath(dep_lib_dir, "decompress/zstd_decompress_block.c").}
+  {.compile: joinPath(dep_lib_dir, "decompress/zstd_decompress.c").}
 
 {.pragma: c_dep_type, header: dep_header_name, bycopy.}
 {.pragma: c_dep_proc, importc, header: dep_header_name, cdecl.}
