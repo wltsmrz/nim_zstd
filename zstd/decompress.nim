@@ -1,8 +1,8 @@
-import std/os
 import std/streams
 import ./common
 
 when not defined(useExternalZstd):
+  import std/os
   {.passC: "-I" & joinPath(dep_lib_dir, "decompress").}
   {.compile: joinPath(dep_lib_dir, "decompress/huf_decompress.c").}
   {.compile: joinPath(dep_lib_dir, "decompress/zstd_ddict.c").}
@@ -96,9 +96,9 @@ proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte], dict: openArray[byte]
 
 proc decompress*(in_stream: Stream, out_stream: Stream) =
   if isNil(in_stream):
-    raise newException(AssertionError, "zstd compress in stream is nil")
+    raise newException(AssertionError, "zstd decompress in stream is nil")
   if isNil(out_stream):
-    raise newException(AssertionError, "zstd compress out stream is nil")
+    raise newException(AssertionError, "zstd decompress out stream is nil")
 
   var dstream = ZSTD_createDStream()
   var init_res = ZSTD_initDStream(dstream)
@@ -126,14 +126,11 @@ proc decompress*(in_stream: Stream, out_stream: Stream) =
   out_stream.close()
 
 proc decompress*(src: sink string): seq[byte] {.inline.} =
-  var src_bytes = bytes(src)
-  return decompress(move(src_bytes))
+  decompress(bytes(src))
 
 proc decompress*(ctx: ptr ZSTD_DCtx, src: sink string): seq[byte] {.inline.} =
-  var src_bytes = bytes(src)
-  return decompress(ctx, move(src_bytes))
+  decompress(ctx, bytes(src))
 
-proc decompress*(ctx: ptr ZSTD_DCtx, src: sink string, dict: openArray[byte]): seq[byte] {.inline.} =
-  var src_bytes = bytes(src)
-  return decompress(ctx, move(src_bytes), dict)
+proc decompress*(ctx: ptr ZSTD_DCtx, src: sink string, dict: sink string): seq[byte] {.inline.} =
+  decompress(ctx, bytes(src), bytes(dict))
 

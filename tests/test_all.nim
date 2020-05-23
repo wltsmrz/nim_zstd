@@ -48,12 +48,12 @@ test "With dict":
 
   var cctx = new_compress_context()
   var compressed = compress(cctx, source, dict, level=3)
-  var compressed_s = compress(cctx, readFile("tests/files/nixon.bmp"), dict, level=3)
+  var compressed_s = compress(cctx, readFile("tests/files/nixon.bmp"), readFile("tests/files/nixon.dict"), level=3)
   discard free_context(cctx)
 
   var dctx = new_decompress_context()
   var decompressed = decompress(dctx, compressed, dict)
-  var decompressed_s = decompress(dctx, readFile("tests/files/nixon.zst"), dict)
+  var decompressed_s = decompress(dctx, readFile("tests/files/nixon.zst"), readFile("tests/files/nixon.dict"))
   discard free_context(dctx)
 
   check equalmem(decompressed[0].addr, source[0].addr, source.len)

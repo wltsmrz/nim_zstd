@@ -1,8 +1,8 @@
-import std/os
 import std/streams
 import ./common
 
 when not defined(useExternalZstd):
+  import std/os
   {.passC: "-I" & joinPath(dep_lib_dir, "compress").}
   {.compile: joinPath(dep_lib_dir, "compress/fse_compress.c").}
   {.compile: joinPath(dep_lib_dir, "compress/hist.c").}
@@ -10,6 +10,7 @@ when not defined(useExternalZstd):
   {.compile: joinPath(dep_lib_dir, "compress/zstd_compress.c").}
   {.compile: joinPath(dep_lib_dir, "compress/zstd_compress_literals.c").}
   {.compile: joinPath(dep_lib_dir, "compress/zstd_compress_sequences.c").}
+  {.compile: joinPath(dep_lib_dir, "compress/zstd_compress_superblock.c").}
   {.compile: joinPath(dep_lib_dir, "compress/zstd_double_fast.c").}
   {.compile: joinPath(dep_lib_dir, "compress/zstd_fast.c").}
   {.compile: joinPath(dep_lib_dir, "compress/zstd_lazy.c").}
@@ -25,6 +26,7 @@ proc ZSTD_minCLevel*(): cint {.c_dep_proc.}
 proc ZSTD_maxCLevel*(): cint {.c_dep_proc.}
 proc ZSTD_compressBound*(a: csize_t): csize_t {.c_dep_proc.}
 proc ZSTD_compress*(a: ptr byte, b: csize_t, c: ptr byte, d: csize_t, e: cint): csize_t {.c_dep_proc.}
+
 type ZSTD_CCtx* {.c_dep_type.} = object
 proc ZSTD_createCCtx*(): ptr ZSTD_CCtx {.c_dep_proc.}
 proc ZSTD_freeCCtx*(a: ptr ZSTD_CCtx): csize_t {.c_dep_proc.}
@@ -32,7 +34,6 @@ proc ZSTD_compressCCtx*(a: ptr ZSTD_CCtx, b: ptr byte, c: csize_t, d: ptr byte, 
 proc ZSTD_compress_usingDict*(a: ptr ZSTD_CCtx, b: ptr byte, c: csize_t, d: ptr byte, e: csize_t, f: ptr byte, g: csize_t, h: cint): csize_t {.c_dep_proc.}
 
 type ZSTD_CDict* {.c_dep_type.} = object
-
 proc ZSTD_createCDict*(a: ptr byte, b: csize_t, c: cint): ptr ZSTD_CDict {.c_dep_proc.}
 proc ZSTD_freeCDict*(a: ptr ZSTD_CDict): csize_t {.c_dep_proc.}
 proc ZSTD_compressUsingCDict*(a: ptr ZSTD_CCtx, b: ptr byte, c: csize_t, d: ptr byte, e: csize_t, f: ptr ZSTD_CDict): csize_t {.c_dep_proc.}
@@ -130,14 +131,11 @@ proc compress*(in_stream: Stream, out_stream: Stream, level: int = 3) =
   out_stream.close()
 
 proc compress*(src: sink string, level: int = 3): seq[byte] {.inline.} =
-  var src_bytes = bytes(src)
-  return compress(move(src_bytes), level)
+  compress(bytes(src), level)
 
 proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, level: int = 3): seq[byte] {.inline.} =
-  var src_bytes = bytes(src)
-  return compress(ctx, move(src_bytes), level)
+  compress(ctx, bytes(src), level)
 
-proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, dict: openArray[byte], level: int = 3): seq[byte] {.inline.} =
-  var src_bytes = bytes(src)
-  return compress(ctx, move(src_bytes), dict, level)
+proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, dict: sink string, level: int = 3): seq[byte] {.inline.} =
+  compress(ctx, bytes(src), bytes(dict), level)
 
