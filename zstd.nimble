@@ -1,4 +1,4 @@
-version = "0.4.0"
+version = "0.5.0"
 author = "wltsmrz"
 description = "Nim bindings for zstd"
 license = "MIT"
