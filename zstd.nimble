@@ -6,7 +6,3 @@ skipDirs = @["examples"]
 skipFiles = @["README.md"]
 installDirs = @["zstd"]
 requires "nim >= 1.2.0"
-
-before install:
-  exec("git submodule update --init --depth 1")
-

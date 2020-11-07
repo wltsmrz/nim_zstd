@@ -1,4 +1,0 @@
-[submodule "zstd/deps/zstd"]
-	path = zstd/deps/zstd
-	url = git@github.com:facebook/zstd.git
-	branch = v1.4.5
