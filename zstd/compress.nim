@@ -131,11 +131,11 @@ proc compress*(in_stream: Stream, out_stream: Stream, level: int = 3) =
   out_stream.close()
 
 proc compress*(src: sink string, level: int = 3): seq[byte] {.inline.} =
-  compress(bytes(src), level)
+  compress(toOpenArrayByte(src, 0, len(src)-1), level)
 
 proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, level: int = 3): seq[byte] {.inline.} =
-  compress(ctx, bytes(src), level)
+  compress(ctx, toOpenArrayByte(src, 0, len(src)-1), level)
 
 proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, dict: sink string, level: int = 3): seq[byte] {.inline.} =
-  compress(ctx, bytes(src), bytes(dict), level)
+  compress(ctx, toOpenArrayByte(src, 0, len(src)-1), toOpenArrayByte(dict, 0, len(dict)-1), level)
 

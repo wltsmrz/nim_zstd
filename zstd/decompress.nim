@@ -126,11 +126,14 @@ proc decompress*(in_stream: Stream, out_stream: Stream) =
   out_stream.close()
 
 proc decompress*(src: sink string): seq[byte] {.inline.} =
-  decompress(bytes(src))
+  decompress(toOpenArrayByte(src, 0, len(src)-1))
 
 proc decompress*(ctx: ptr ZSTD_DCtx, src: sink string): seq[byte] {.inline.} =
-  decompress(ctx, bytes(src))
+  decompress(ctx, toOpenArrayByte(src, 0, len(src)-1))
+
+proc decompress*(ctx: ptr ZSTD_DCtx, src: sink seq[byte], dict: sink string): seq[byte] {.inline.} =
+  decompress(ctx, src, toOpenArrayByte(dict, 0, len(dict)-1))
 
 proc decompress*(ctx: ptr ZSTD_DCtx, src: sink string, dict: sink string): seq[byte] {.inline.} =
-  decompress(ctx, bytes(src), bytes(dict))
-
+  decompress(ctx, toOpenArrayByte(src, 0, len(src)-1), toOpenArrayByte(dict, 0, len(dict)-1))
+  

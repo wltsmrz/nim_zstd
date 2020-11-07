@@ -6,7 +6,7 @@ import ../zstd/compress
 import ../zstd/decompress
 
 test "Simple":
-  var source = bytes(readFile("tests/files/nixon.bmp"))
+  var source = readFile("tests/files/nixon.bmp")
   var compressed = compress(source, level=3)
   var decompressed = decompress(compressed)
   var compressed_s = compress(readFile("tests/files/nixon.bmp"), level=3)
@@ -16,7 +16,7 @@ test "Simple":
   check equalmem(decompressed_s[0].addr, decompressed[0].addr, decompressed.len)
 
 test "Simple - default compression level":
-  var source = bytes(readFile("tests/files/nixon.bmp"))
+  var source = readFile("tests/files/nixon.bmp")
   var compressed = compress(source)
   var decompressed = decompress(compressed)
   var compressed_s = compress(readFile("tests/files/nixon.bmp"))
@@ -26,9 +26,9 @@ test "Simple - default compression level":
   check equalmem(decompressed_s[0].addr, decompressed[0].addr, decompressed.len)
 
 test "With context":
-  var source = bytes(readFile("tests/files/nixon.bmp"))
-
+  var source = readFile("tests/files/nixon.bmp")
   var cctx = new_compress_context()
+
   var compressed = compress(cctx, source, level=3)
   var compressed_s = compress(cctx, readFile("tests/files/nixon.bmp"), level=3)
   discard free_context(cctx)
@@ -43,8 +43,8 @@ test "With context":
   check equalmem(decompressed_s[0].addr, decompressed[0].addr, decompressed.len)
 
 test "With dict":
-  var source = bytes(readFile("tests/files/nixon.bmp"))
-  var dict = bytes(readFile("tests/files/nixon.dict"))
+  var source = readFile("tests/files/nixon.bmp")
+  var dict = readFile("tests/files/nixon.dict")
 
   var cctx = new_compress_context()
   var compressed = compress(cctx, source, dict, level=3)
@@ -72,8 +72,8 @@ test "Stream":
   var d_out_stream = newFileStream("tests/files/nixon-copy.bmp", fmWrite)
   decompress(d_in_stream, d_out_stream)
 
-  var original = bytes(readFile("tests/files/nixon.bmp"))
-  var cycled = bytes(readFile("tests/files/nixon-copy.bmp"))
+  var original = readFile("tests/files/nixon.bmp")
+  var cycled = readFile("tests/files/nixon-copy.bmp")
 
   check equalmem(cycled[0].addr, original[0].addr, original.len)
 

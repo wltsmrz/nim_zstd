@@ -52,8 +52,3 @@ proc ZSTD_versionNumber*(): cuint {.c_dep_proc.}
 proc ZSTD_versionString*(): cstring {.c_dep_proc.}
 proc ZSTD_isError*(a: csize_t): bool {.c_dep_proc.}
 proc ZSTD_getErrorName*(a: csize_t): cstring {.c_dep_proc.}
-
-proc bytes*(s: string): seq[byte] =
-  result = newSeqOfCap[byte](s.len)
-  for c in s:
-    result.add(byte(c))
