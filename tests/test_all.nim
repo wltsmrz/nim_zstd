@@ -1,7 +1,6 @@
 import os
 import streams
 import unittest
-import ../zstd/common
 import ../zstd/compress
 import ../zstd/decompress
 

@@ -1,7 +1,5 @@
 import std/os
-import std/strutils
 from os {.all.} import parentDirPos # for parentDirHost
-
 
 proc joinPathHost*(head, tail: string): string {.noSideEffect.} =
   when not defined(mingw):

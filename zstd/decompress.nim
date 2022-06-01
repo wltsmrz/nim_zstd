@@ -2,7 +2,6 @@ import std/streams
 import ./common
 
 when not defined(useExternalZstd):
-  import std/os
   {.passC: "-I" & joinPathHost(dep_lib_dir, "decompress").}
   {.compile: joinPathHost(dep_lib_dir, "decompress/huf_decompress.c").}
   {.compile: joinPathHost(dep_lib_dir, "decompress/zstd_ddict.c").}
@@ -52,14 +51,14 @@ proc decompress*(src: sink openArray[byte]): seq[byte] =
   let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
   case dst_cap:
     of ZSTD_CONTENTSIZE_UNKNOWN:
-      raise newException(AssertionError, "ZSTD_CONTENTSIZE_UNKNOWN")
+      assert(false, "ZSTD_CONTENTSIZE_UNKNOWN")
     of ZSTD_CONTENTSIZE_ERROR:
-      raise newException(AssertionError, "ZSTD_CONTENTSIZE_ERROR")
+      assert(false, "ZSTD_CONTENTSIZE_ERROR")
     else: discard
   var dst_buf = newSeq[byte](dst_cap)
   let res = ZSTD_decompress(addr(dst_buf[0]), cast[csize_t](dst_cap), src_ptr, src_cap)
   if ZSTD_isError(res):
-    raise newException(AssertionError, $ZSTD_getErrorName(res))
+    assert(false, $ZSTD_getErrorName(res))
   return dst_buf
 
 proc decompress*(ctx: ptr ZSTD_DCtx, src: sink openArray[byte]): seq[byte] =
@@ -68,14 +67,14 @@ proc decompress*(ctx: ptr ZSTD_DCtx, src: sink openArray[byte]): seq[byte] =
   let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
   case dst_cap:
     of ZSTD_CONTENTSIZE_UNKNOWN:
-      raise newException(AssertionError, "ZSTD_CONTENTSIZE_UNKNOWN")
+      assert(false, "ZSTD_CONTENTSIZE_UNKNOWN")
     of ZSTD_CONTENTSIZE_ERROR:
-      raise newException(AssertionError, "ZSTD_CONTENTSIZE_ERROR")
+      assert(false, "ZSTD_CONTENTSIZE_ERROR")
     else: discard
   var dst_buf = newSeq[byte](dst_cap)
   let res = ZSTD_decompressDCtx(ctx, addr(dst_buf[0]), cast[csize_t](dst_cap), src_ptr, src_cap)
   if ZSTD_isError(res):
-    raise newException(AssertionError, $ZSTD_getErrorName(res))
+    assert(false, $ZSTD_getErrorName(res))
   return dst_buf
 
 proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte], dict: openArray[byte]): seq[byte] =
@@ -84,26 +83,24 @@ proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte], dict: openArray[byte]
   let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
   case dst_cap:
     of ZSTD_CONTENTSIZE_UNKNOWN:
-      raise newException(AssertionError, "ZSTD_CONTENTSIZE_UNKNOWN")
+      assert(false, "ZSTD_CONTENTSIZE_UNKNOWN")
     of ZSTD_CONTENTSIZE_ERROR:
-      raise newException(AssertionError, "ZSTD_CONTENTSIZE_ERROR")
+      assert(false, "ZSTD_CONTENTSIZE_ERROR")
     else: discard
   var dst_buf = newSeq[byte](dst_cap)
   let res = ZSTD_decompress_usingDict(ctx, addr(dst_buf[0]), cast[csize_t](dst_cap), src_ptr, src_cap, unsafeAddr(dict[0]), cast[csize_t](dict.len))
   if ZSTD_isError(res):
-    raise newException(AssertionError, $ZSTD_getErrorName(res))
+    assert(false, $ZSTD_getErrorName(res))
   return dst_buf
 
 proc decompress*(in_stream: Stream, out_stream: Stream) =
-  if isNil(in_stream):
-    raise newException(AssertionError, "zstd decompress in stream is nil")
-  if isNil(out_stream):
-    raise newException(AssertionError, "zstd decompress out stream is nil")
+  assert(not isNil(in_stream), "zstd decompress in stream is nil")
+  assert(not isNil(out_stream), "zstd decompress out stream is nil")
 
   var dstream = ZSTD_createDStream()
   var init_res = ZSTD_initDStream(dstream)
   if ZSTD_isError(init_res):
-    raise newException(AssertionError, $ZSTD_getErrorName(init_res))
+    assert(false, $ZSTD_getErrorName(init_res))
 
   let in_size = ZSTD_DStreamInSize()
   let out_size = ZSTD_DStreamOutSize()
@@ -117,7 +114,7 @@ proc decompress*(in_stream: Stream, out_stream: Stream) =
       var cmp_output = ZSTD_outBuffer(dst: dst_buf[0].addr, size: out_size, pos: cast[csize_t](0))
       to_read = ZSTD_decompressStream(dstream, cmp_output.addr, cmp_input.addr)
       if ZSTD_isError(to_read):
-        raise newException(AssertionError, $ZSTD_getErrorName(to_read))
+        assert(false, $ZSTD_getErrorName(to_read))
       out_stream.writeData(dst_buf[0].addr, cmp_output.pos.int)
 
   out_stream.flush()

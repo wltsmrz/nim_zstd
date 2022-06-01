@@ -2,7 +2,6 @@ import std/streams
 import ./common
 
 when not defined(useExternalZstd):
-  import std/os
   {.passC: "-I" & joinPathHost(dep_lib_dir, "compress").}
   {.compile: joinPathHost(dep_lib_dir, "compress/fse_compress.c").}
   {.compile: joinPathHost(dep_lib_dir, "compress/hist.c").}
@@ -66,7 +65,7 @@ proc compress*(src: sink openArray[byte], level: int = 3): seq[byte] =
   var dst_buf = newSeq[byte](dst_cap.uint)
   let res: uint = ZSTD_compress(addr(dst_buf[0]), dst_cap, src_ptr, src_cap, level.cint)
   if ZSTD_isError(res):
-    raise newException(AssertionError, $ZSTD_getErrorName(res))
+    assert(false, $ZSTD_getErrorName(res))
   dst_buf.setLen(res)
   return dst_buf
 
@@ -77,7 +76,7 @@ proc compress*(ctx: ptr ZSTD_CCtx, src: sink openArray[byte], level: int = 3): s
   var dst_buf = newSeq[byte](dst_cap.uint)
   let res: uint = ZSTD_compressCCtx(ctx, addr(dst_buf[0]), dst_cap, src_ptr, src_cap, level.cint)
   if ZSTD_isError(res):
-    raise newException(AssertionError, $ZSTD_getErrorName(res))
+    assert(false, $ZSTD_getErrorName(res))
   dst_buf.setLen(res)
   return dst_buf
 
@@ -88,20 +87,17 @@ proc compress*(ctx: ptr ZSTD_CCtx, src: sink openArray[byte], dict: openArray[by
   var dst_buf = newSeq[byte](dst_cap.uint)
   let res: uint = ZSTD_compress_usingDict(ctx, addr(dst_buf[0]), dst_cap, src_ptr, src_cap, unsafeAddr(dict[0]), cast[csize_t](dict.len), level.cint)
   if ZSTD_isError(res):
-    raise newException(AssertionError, $ZSTD_getErrorName(res))
+    assert(false, $ZSTD_getErrorName(res))
   dst_buf.setLen(res)
   return dst_buf
   
 proc compress*(in_stream: Stream, out_stream: Stream, level: int = 3) =
-  if isNil(in_stream):
-    raise newException(AssertionError, "zstd compress in stream is nil")
-  if isNil(out_stream):
-    raise newException(AssertionError, "zstd compress out stream is nil")
-
+  assert(not isNil(in_stream), "zstd compress in stream is nil")
+  assert(not isNil(out_stream), "zstd compress out stream is nil")
   var cstream = ZSTD_createCStream()
   var init_res = ZSTD_initCStream(cstream, level.cint)
-  if ZSTD_isError(init_res):
-    raise newException(AssertionError, $ZSTD_getErrorName(init_res))
+  if (ZSTD_isError(init_res)):
+    assert(false, $ZSTD_getErrorName(init_res))
   let in_size = ZSTD_CStreamInSize()
   let out_size = ZSTD_CStreamOutSize()
   var src_buf = newSeq[byte](in_size.int)
@@ -115,7 +111,7 @@ proc compress*(in_stream: Stream, out_stream: Stream, level: int = 3) =
       var cmp_output = ZSTD_outBuffer(dst: dst_buf[0].addr, size: out_size, pos: cast[csize_t](0))
       to_read = ZSTD_compressStream(cstream, cmp_output.addr, cmp_input.addr)
       if ZSTD_isError(to_read):
-        raise newException(AssertionError, $ZSTD_getErrorName(to_read))
+        assert(false, $ZSTD_getErrorName(to_read))
       to_read = min(in_size, to_read)
       out_stream.writeData(dst_buf[0].addr, cmp_output.pos.int)
 
