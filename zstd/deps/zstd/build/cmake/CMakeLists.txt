@@ -7,7 +7,7 @@
 # in the COPYING file in the root directory of this source tree).
 # ################################################################
 
-cmake_minimum_required(VERSION 2.8.9 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
   
 # As of 2018-12-26 ZSTD has been validated to build with cmake version 3.13.2 new policies. 
 # Set and use the newest cmake policies that are validated to work 
@@ -92,8 +92,14 @@ else ()
     add_definitions(-DZSTD_LEGACY_SUPPORT=0)
 endif ()
 
+if (ANDROID)
+    set(ZSTD_MULTITHREAD_SUPPORT_DEFAULT OFF)
+else()
+    set(ZSTD_MULTITHREAD_SUPPORT_DEFAULT ON)
+endif()
+
 # Multi-threading support
-option(ZSTD_MULTITHREAD_SUPPORT "MULTITHREADING SUPPORT" ON)
+option(ZSTD_MULTITHREAD_SUPPORT "MULTITHREADING SUPPORT" ${ZSTD_MULTITHREAD_SUPPORT_DEFAULT})
 
 if (ZSTD_MULTITHREAD_SUPPORT)
     message(STATUS "ZSTD_MULTITHREAD_SUPPORT is enabled")

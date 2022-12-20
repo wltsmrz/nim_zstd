@@ -1,5 +1,5 @@
 # ################################################################
-# Copyright (c) 2020-2020, Facebook, Inc.
+# Copyright (c) Facebook, Inc.
 # All rights reserved.
 #
 # This source code is licensed under both the BSD-style license (found in the
@@ -20,7 +20,7 @@ import urllib.request
 
 GITHUB_API_PR_URL = "https://api.github.com/repos/facebook/zstd/pulls?state=open"
 GITHUB_URL_TEMPLATE = "https://github.com/{}/zstd"
-MASTER_BUILD = {"user": "facebook", "branch": "dev", "hash": None}
+RELEASE_BUILD = {"user": "facebook", "branch": "dev", "hash": None}
 
 # check to see if there are any new PRs every minute
 DEFAULT_MAX_API_CALL_FREQUENCY_SEC = 60
@@ -87,7 +87,7 @@ def clone_and_build(build):
             git clone {github_url} zstd-{user}-{sha} &&
             cd zstd-{user}-{sha} &&
             {checkout_command}
-            make &&
+            make -j &&
             cd ../
         """.format(
                 user=build["user"],
@@ -100,7 +100,7 @@ def clone_and_build(build):
         )
         return "zstd-{user}-{sha}/zstd".format(user=build["user"], sha=build["hash"])
     else:
-        os.system("cd ../ && make && cd tests")
+        os.system("cd ../ && make -j && cd tests")
         return "../zstd"
 
 
@@ -112,9 +112,9 @@ def parse_benchmark_output(output):
 def benchmark_single(executable, level, filename):
     return parse_benchmark_output((
         subprocess.run(
-            [executable, "-qb{}".format(level), filename], stderr=subprocess.PIPE
+            [executable, "-qb{}".format(level), filename], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         )
-        .stderr.decode("utf-8")
+        .stdout.decode("utf-8")
         .split(" ")
     ))
 
@@ -145,7 +145,7 @@ def benchmark(build, filenames, levels, iterations):
 def benchmark_dictionary_single(executable, filenames_directory, dictionary_filename, level, iterations):
     cspeeds, dspeeds = [], []
     for _ in range(iterations):
-        output = subprocess.run([executable, "-qb{}".format(level), "-D", dictionary_filename, "-r", filenames_directory], stderr=subprocess.PIPE).stderr.decode("utf-8").split(" ")
+        output = subprocess.run([executable, "-qb{}".format(level), "-D", dictionary_filename, "-r", filenames_directory], stdout=subprocess.PIPE).stdout.decode("utf-8").split(" ")
         cspeed, dspeed = parse_benchmark_output(output)
         cspeeds.append(cspeed)
         dspeeds.append(dspeed)
@@ -264,11 +264,11 @@ def main(filenames, levels, iterations, builds=None, emails=None, continuous=Fal
         for test_build in builds:
             if dictionary_filename == None:
                 regressions = get_regressions(
-                    MASTER_BUILD, test_build, iterations, filenames, levels
+                    RELEASE_BUILD, test_build, iterations, filenames, levels
                 )
             else:
                 regressions = get_regressions_dictionary(
-                    MASTER_BUILD, test_build, filenames, dictionary_filename, levels, iterations
+                    RELEASE_BUILD, test_build, filenames, dictionary_filename, levels, iterations
                 )
             body = "\n".join(regressions)
             if len(regressions) > 0:
@@ -296,7 +296,7 @@ if __name__ == "__main__":
     parser.add_argument("--emails", help="email addresses of people who will be alerted upon regression. Only for continuous mode", default=None)
     parser.add_argument("--frequency", help="specifies the number of seconds to wait before each successive check for new PRs in continuous mode", default=DEFAULT_MAX_API_CALL_FREQUENCY_SEC)
     parser.add_argument("--mode", help="'fastmode', 'onetime', 'current', or 'continuous' (see README.md for details)", default="current")
-    parser.add_argument("--dict", help="filename of dictionary to use (when set, this dictioanry will be used to compress the files provided inside --directory)", default=None)
+    parser.add_argument("--dict", help="filename of dictionary to use (when set, this dictionary will be used to compress the files provided inside --directory)", default=None)
 
     args = parser.parse_args()
     filenames = args.directory
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         builds = [{"user": None, "branch": "None", "hash": None}]
         main(filenames, levels, iterations, builds, frequency=frequency, dictionary_filename=dictionary_filename)
     elif mode == "fastmode":
-        builds = [{"user": "facebook", "branch": "master", "hash": None}]
+        builds = [{"user": "facebook", "branch": "release", "hash": None}]
         main(filenames, levels, iterations, builds, frequency=frequency, dictionary_filename=dictionary_filename)
     else:
         main(filenames, levels, iterations, None, emails, True, frequency=frequency, dictionary_filename=dictionary_filename)

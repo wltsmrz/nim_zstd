@@ -8,7 +8,6 @@ This directory contains the following programs and scripts:
 - `paramgrill` : parameter tester for zstd
 - `test-zstd-speed.py` : script for testing zstd speed difference between commits
 - `test-zstd-versions.py` : compatibility test between zstd versions stored on Github (v0.1+)
-- `zbufftest`  : Test tool to check ZBUFF (a buffered streaming API) integrity
 - `zstreamtest` : Fuzzer test tool for zstd streaming API
 - `legacy` : Test tool to test decoding of legacy zstd frames
 - `decodecorpus` : Tool to generate valid Zstandard frames, for verifying decoder implementations
@@ -28,7 +27,7 @@ desktop machine for every pull request that is made to the zstd repo but can als
 be run on any machine via the command line interface.
 
 There are three modes of usage for this script: fastmode will just run a minimal single
-build comparison (between facebook:dev and facebook:master), onetime will pull all the current
+build comparison (between facebook:dev and facebook:release), onetime will pull all the current
 pull requests from the zstd repo and compare facebook:dev to all of them once, continuous
 will continuously get pull requests from the zstd repo and run benchmarks against facebook:dev.
 
@@ -57,7 +56,7 @@ optional arguments:
   --mode MODE           'fastmode', 'onetime', 'current', or 'continuous' (see
                         README.md for details)
   --dict DICT           filename of dictionary to use (when set, this
-                        dictioanry will be used to compress the files provided
+                        dictionary will be used to compress the files provided
                         inside --directory)
 ```
 

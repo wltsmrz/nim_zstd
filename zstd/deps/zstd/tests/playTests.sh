@@ -8,22 +8,22 @@ die() {
 }
 
 datagen() {
-    "$DATAGEN_BIN" $@
+    "$DATAGEN_BIN" "$@"
 }
 
 zstd() {
     if [ -z "$EXEC_PREFIX" ]; then
-        "$ZSTD_BIN" $@
+        "$ZSTD_BIN" "$@"
     else
-        "$EXEC_PREFIX" "$ZSTD_BIN" $@
+        "$EXEC_PREFIX" "$ZSTD_BIN" "$@"
     fi
 }
 
 sudoZstd() {
     if [ -z "$EXEC_PREFIX" ]; then
-        sudo "$ZSTD_BIN" $@
+        sudo "$ZSTD_BIN" "$@"
     else
-        sudo "$EXEC_PREFIX" "$ZSTD_BIN" $@
+        sudo "$EXEC_PREFIX" "$ZSTD_BIN" "$@"
     fi
 }
 
@@ -78,6 +78,11 @@ println() {
     printf '%b\n' "${*}"
 }
 
+if [ -z "${size}" ]; then
+    size=
+else
+    size=${size}
+fi
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PRGDIR="$SCRIPT_DIR/../programs"
@@ -109,24 +114,65 @@ esac
 case "$UNAME" in
   Darwin) MD5SUM="md5 -r" ;;
   FreeBSD) MD5SUM="gmd5sum" ;;
+  NetBSD) MD5SUM="md5 -n" ;;
   OpenBSD) MD5SUM="md5" ;;
   *) MD5SUM="md5sum" ;;
 esac
 
 MTIME="stat -c %Y"
 case "$UNAME" in
-    Darwin | FreeBSD | OpenBSD) MTIME="stat -f %m" ;;
+    Darwin | FreeBSD | OpenBSD | NetBSD) MTIME="stat -f %m" ;;
 esac
+
+assertSameMTime() {
+    MT1=$($MTIME "$1")
+    MT2=$($MTIME "$2")
+    echo MTIME $MT1 $MT2
+    [ "$MT1" = "$MT2" ] || die "mtime on $1 doesn't match mtime on $2 ($MT1 != $MT2)"
+}
+
+GET_PERMS="stat -c %a"
+case "$UNAME" in
+    Darwin | FreeBSD | OpenBSD | NetBSD) GET_PERMS="stat -f %Lp" ;;
+esac
+
+assertFilePermissions() {
+    STAT1=$($GET_PERMS "$1")
+    STAT2=$2
+    [ "$STAT1" = "$STAT2" ] || die "permissions on $1 don't match expected ($STAT1 != $STAT2)"
+}
+
+assertSamePermissions() {
+    STAT1=$($GET_PERMS "$1")
+    STAT2=$($GET_PERMS "$2")
+    [ "$STAT1" = "$STAT2" ] || die "permissions on $1 don't match those on $2 ($STAT1 != $STAT2)"
+}
 
 DIFF="diff"
 case "$UNAME" in
   SunOS) DIFF="gdiff" ;;
 esac
 
-println "\nStarting playTests.sh isWindows=$isWindows EXE_PREFIX='$EXE_PREFIX' ZSTD_BIN='$ZSTD_BIN' DATAGEN_BIN='$DATAGEN_BIN'"
 
-[ -n "$ZSTD_BIN" ] || die "\$ZSTD_BIN variable must be defined!"
-[ -n "$DATAGEN_BIN" ] || die "\$DATAGEN_BIN variable must be defined!"
+# check if ZSTD_BIN is defined. if not, use the default value
+if [ -z "${ZSTD_BIN}" ]; then
+  println "\nZSTD_BIN is not set. Using the default value..."
+  ZSTD_BIN="$PRGDIR/zstd"
+fi
+
+# check if DATAGEN_BIN is defined. if not, use the default value
+if [ -z "${DATAGEN_BIN}" ]; then
+  println "\nDATAGEN_BIN is not set. Using the default value..."
+  DATAGEN_BIN="$TESTDIR/datagen"
+fi
+
+# Why was this line here ? Generates a strange ZSTD_BIN when EXE_PREFIX is non empty
+# ZSTD_BIN="$EXE_PREFIX$ZSTD_BIN"
+
+# assertions
+[ -n "$ZSTD_BIN" ] || die "zstd not found at $ZSTD_BIN! \n Please define ZSTD_BIN pointing to the zstd binary. You might also consider rebuilding zstd following the instructions in README.md"
+[ -n "$DATAGEN_BIN" ] || die "datagen not found at $DATAGEN_BIN! \n Please define DATAGEN_BIN pointing to the datagen binary. You might also consider rebuilding zstd tests following the instructions in README.md. "
+println "\nStarting playTests.sh isWindows=$isWindows EXE_PREFIX='$EXE_PREFIX' ZSTD_BIN='$ZSTD_BIN' DATAGEN_BIN='$DATAGEN_BIN'"
 
 if echo hello | zstd -v -T2 2>&1 > $INTOVOID | grep -q 'multi-threading is disabled'
 then
@@ -140,8 +186,14 @@ fi
 println "\n===>  simple tests "
 
 datagen > tmp
+zstd -h
+zstd -H
+zstd -V
 println "test : basic compression "
 zstd -f tmp                      # trivial compression case, creates tmp.zst
+zstd -f -z tmp
+zstd -f -k tmp
+zstd -f -C tmp
 println "test : basic decompression"
 zstd -df tmp.zst                 # trivial decompression case (overwrites tmp)
 println "test : too large compression level => auto-fix"
@@ -171,11 +223,9 @@ println "test : compress to stdout"
 zstd tmp -c > tmpCompressed
 zstd tmp --stdout > tmpCompressed       # long command format
 println "test : compress to named file"
-rm tmpCompressed
+rm -f tmpCompressed
 zstd tmp -o tmpCompressed
 test -f tmpCompressed   # file must be created
-println "test : -o must be followed by filename (must fail)"
-zstd tmp -of tmpCompressed && die "-o must be followed by filename "
 println "test : force write, correct order"
 zstd tmp -fo tmpCompressed
 println "test : forgotten argument"
@@ -227,6 +277,10 @@ zstd -q -f tmpro
 println "test: --no-progress flag"
 zstd tmpro -c --no-progress | zstd -d -f -o "$INTOVOID" --no-progress
 zstd tmpro -cv --no-progress | zstd -dv -f -o "$INTOVOID" --no-progress
+println "test: --progress flag"
+zstd tmpro -c | zstd -d -f -o "$INTOVOID" --progress 2>&1 | grep -E "[A-Za-z0-9._ ]+: [0-9]+ bytes"
+zstd tmpro -c | zstd -d -f -q -o "$INTOVOID" --progress 2>&1 | grep -E "[A-Za-z0-9._ ]+: [0-9]+ bytes"
+zstd tmpro -c | zstd -d -f -v -o "$INTOVOID" 2>&1 | grep -E "[A-Za-z0-9._ ]+: [0-9]+ bytes"
 rm -f tmpro tmpro.zst
 println "test: overwrite input file (must fail)"
 zstd tmp -fo tmp && die "zstd compression overwrote the input file"
@@ -242,16 +296,30 @@ zstd tmp -c --compress-literals    --fast=1 | zstd -t
 zstd tmp -c --compress-literals    -19      | zstd -t
 zstd -b --fast=1 -i0e1 tmp --compress-literals
 zstd -b --fast=1 -i0e1 tmp --no-compress-literals
+println "test: --no-check for decompression"
+zstd -f tmp -o tmp_corrupt.zst --check
+zstd -f tmp -o tmp.zst --no-check
+printf '\xDE\xAD\xBE\xEF' | dd of=tmp_corrupt.zst bs=1 seek=$(($(wc -c < "tmp_corrupt.zst") - 4)) count=4 conv=notrunc # corrupt checksum in tmp
+zstd -d -f tmp_corrupt.zst --no-check
+zstd -d -f tmp_corrupt.zst --check --no-check # final flag overrides
+zstd -d -f tmp.zst --no-check
+
+if [ "$isWindows" = false ]; then
+  if [ -n "$(which readelf)" ]; then
+    println "test: check if binary has executable stack (#2963)"
+    readelf -lW "$ZSTD_BIN" | grep 'GNU_STACK .* RW ' || die "zstd binary has executable stack!"
+  fi
+fi
 
 println "\n===> zstdgrep tests"
 ln -sf "$ZSTD_BIN" zstdcat
 rm -f tmp_grep
 echo "1234" > tmp_grep
 zstd -f tmp_grep
-lines=$(ZCAT=./zstdcat $ZSTDGREP 2>&1 "1234" tmp_grep tmp_grep.zst | wc -l)
+lines=$(ZCAT=./zstdcat "$ZSTDGREP" 2>&1 "1234" tmp_grep tmp_grep.zst | wc -l)
 test 2 -eq $lines
-ZCAT=./zstdcat $ZSTDGREP 2>&1 "1234" tmp_grep_bad.zst && die "Should have failed"
-ZCAT=./zstdcat $ZSTDGREP 2>&1 "1234" tmp_grep_bad.zst | grep "No such file or directory" || true
+ZCAT=./zstdcat "$ZSTDGREP" 2>&1 "1234" tmp_grep_bad.zst && die "Should have failed"
+ZCAT=./zstdcat "$ZSTDGREP" 2>&1 "1234" tmp_grep_bad.zst | grep "No such file or directory" || true
 rm -f tmp_grep*
 
 println "\n===>  --exclude-compressed flag"
@@ -282,6 +350,24 @@ zstd --long --rm -r precompressedFilterTestDir
 # Files should get compressed again without the --exclude-compressed flag.
 test -f precompressedFilterTestDir/input.5.zst.zst
 test -f precompressedFilterTestDir/input.6.zst.zst
+rm -rf precompressedFilterTestDir
+println "Test completed"
+
+
+
+println "\n===>  warning prompts should not occur if stdin is an input"
+println "y" > tmpPrompt
+println "hello world" >> tmpPrompt
+zstd tmpPrompt -f
+zstd < tmpPrompt -o tmpPrompt.zst && die "should have aborted immediately and failed to overwrite"
+zstd < tmpPrompt -o tmpPrompt.zst -f    # should successfully overwrite with -f
+zstd -q -d -f tmpPrompt.zst -o tmpPromptRegenerated
+$DIFF tmpPromptRegenerated tmpPrompt    # the first 'y' character should not be swallowed
+
+echo 'yes' | zstd tmpPrompt -v -o tmpPrompt.zst  # accept piped "y" input to force overwrite when using files
+echo 'yes' | zstd < tmpPrompt -v -o tmpPrompt.zst && die "should have aborted immediately and failed to overwrite"
+zstd tmpPrompt - < tmpPrompt -o tmpPromp.zst --rm && die "should have aborted immediately and failed to remove"
+
 println "Test completed"
 
 
@@ -298,12 +384,12 @@ test ! -f tmp.zst   # tmp.zst should no longer be present
 println "test : should quietly not remove non-regular file"
 println hello > tmp
 zstd tmp -f -o "$DEVDEVICE" 2>tmplog > "$INTOVOID"
-grep -v "Refusing to remove non-regular file" tmplog
+grep "Refusing to remove non-regular file" tmplog && die
 rm -f tmplog
-zstd tmp -f -o "$INTOVOID" 2>&1 | grep -v "Refusing to remove non-regular file"
+zstd tmp -f -o "$INTOVOID" 2>&1 | grep "Refusing to remove non-regular file" && die
 println "test : --rm on stdin"
 println a | zstd --rm > $INTOVOID   # --rm should remain silent
-rm tmp
+rm -f tmp
 zstd -f tmp && die "tmp not present : should have failed"
 test ! -f tmp.zst  # tmp.zst should not be created
 println "test : -d -f do not delete destination when source is not present"
@@ -311,7 +397,7 @@ touch tmp    # create destination file
 zstd -d -f tmp.zst && die "attempt to decompress a non existing file"
 test -f tmp  # destination file should still be present
 println "test : -f do not delete destination when source is not present"
-rm tmp         # erase source file
+rm -f tmp         # erase source file
 touch tmp.zst  # create destination file
 zstd -f tmp && die "attempt to compress a non existing file"
 test -f tmp.zst  # destination file should still be present
@@ -325,7 +411,7 @@ println "\n===>  decompression only tests "
 dd bs=1048576 count=1 if=/dev/zero of=tmp
 zstd -d -o tmp1 "$TESTDIR/golden-decompression/rle-first-block.zst"
 $DIFF -s tmp1 tmp
-rm tmp*
+rm -f tmp*
 
 
 println "\n===>  compress multiple files"
@@ -343,7 +429,22 @@ zstd tmp1.zst tmp2.zst -o "$INTOVOID" -f
 zstd -d tmp1.zst tmp2.zst -o tmp
 touch tmpexists
 zstd tmp1 tmp2 -f -o tmpexists
-zstd tmp1 tmp2 -o tmpexists && die "should have refused to overwrite"
+zstd tmp1 tmp2 -q -o tmpexists && die "should have refused to overwrite"
+println gooder > tmp_rm1
+println boi > tmp_rm2
+println worldly > tmp_rm3
+echo 'y' | zstd tmp_rm1 tmp_rm2 -v -o tmp_rm3.zst --rm     # tests the warning prompt for --rm with multiple inputs into once source
+test ! -f tmp_rm1
+test ! -f tmp_rm2
+cp tmp_rm3.zst tmp_rm4.zst
+echo 'Y' | zstd -d tmp_rm3.zst tmp_rm4.zst -v -o tmp_rm_out --rm
+test ! -f tmp_rm3.zst
+test ! -f tmp_rm4.zst
+echo 'yes' | zstd tmp_rm_out tmp_rm3 -c --rm && die "compressing multiple files to stdout with --rm should fail unless -f is specified"
+echo 'yes' | zstd tmp_rm_out tmp_rm3 -c --rm -v && die "compressing multiple files to stdout with --rm should fail unless -f is specified"
+println gooder > tmpexists1
+zstd tmpexists1 tmpexists -c --rm -f > $INTOVOID
+
 # Bug: PR #972
 if [ "$?" -eq 139 ]; then
   die "should not have segfaulted"
@@ -357,7 +458,7 @@ zstd -f tmp*
 test -f tmp1.zst
 test -f tmp2.zst
 test -f tmp3.zst
-rm tmp1 tmp2 tmp3
+rm -f tmp1 tmp2 tmp3
 println "decompress tmp* : "
 zstd -df ./*.zst
 test -f tmp1
@@ -372,7 +473,7 @@ zstd -dc tmpall* > tmpdec
 test -f tmpdec  # should check size of tmpdec (should be 2*(tmp1 + tmp2 + tmp3))
 println "compress multiple files including a missing one (notHere) : "
 zstd -f tmp1 notHere tmp2 && die "missing file not detected!"
-rm tmp*
+rm -f tmp*
 
 
 if [ "$isWindows" = false ] ; then
@@ -387,6 +488,96 @@ if [ "$isWindows" = false ] ; then
     rm -rf tmp*
 fi
 
+println "\n===>  zstd created file permissions tests"
+if [ "$isWindows" = false ] ; then
+    rm -f tmp1 tmp2 tmp1.zst tmp2.zst tmp1.out tmp2.out # todo: remove
+
+    ORIGINAL_UMASK=$(umask)
+    umask 0000
+
+    datagen > tmp1
+    datagen > tmp2
+    assertFilePermissions tmp1 666
+    assertFilePermissions tmp2 666
+
+    println "test : copy 666 permissions in file -> file compression "
+    zstd -f tmp1 -o tmp1.zst
+    assertSamePermissions tmp1 tmp1.zst
+    println "test : copy 666 permissions in file -> file decompression "
+    zstd -f -d tmp1.zst -o tmp1.out
+    assertSamePermissions tmp1.zst tmp1.out
+
+    rm -f tmp1.zst tmp1.out
+
+    println "test : copy 400 permissions in file -> file compression (write to a read-only file) "
+    chmod 0400 tmp1
+    assertFilePermissions tmp1 400
+    zstd -f tmp1 -o tmp1.zst
+    assertSamePermissions tmp1 tmp1.zst
+    println "test : copy 400 permissions in file -> file decompression (write to a read-only file) "
+    zstd -f -d tmp1.zst -o tmp1
+    assertSamePermissions tmp1.zst tmp1
+
+    rm -f tmp1.zst tmp1.out
+
+    println "test : check created permissions from stdin input in compression "
+    zstd -f -o tmp1.zst < tmp1
+    assertFilePermissions tmp1.zst 666
+    println "test : check created permissions from stdin input in decompression "
+    zstd -f -d -o tmp1.out < tmp1.zst
+    assertFilePermissions tmp1.out 666
+
+    rm -f tmp1.zst tmp1.out
+
+    println "test : check created permissions from multiple inputs in compression "
+    zstd -f tmp1 tmp2 -o tmp1.zst
+    assertFilePermissions tmp1.zst 666
+    println "test : check created permissions from multiple inputs in decompression "
+    cp tmp1.zst tmp2.zst
+    zstd -f -d tmp1.zst tmp2.zst -o tmp1.out
+    assertFilePermissions tmp1.out 666
+
+    rm -f tmp1.zst tmp2.zst tmp1.out tmp2.out
+
+    println "test : check permissions on pre-existing output file in compression "
+    chmod 0600 tmp1
+    touch tmp1.zst
+    chmod 0400 tmp1.zst
+    zstd -f tmp1 -o tmp1.zst
+    assertFilePermissions tmp1.zst 600
+    println "test : check permissions on pre-existing output file in decompression "
+    chmod 0400 tmp1.zst
+    touch tmp1.out
+    chmod 0200 tmp1.out
+    zstd -f -d tmp1.zst -o tmp1.out
+    assertFilePermissions tmp1.out 400
+
+    rm -f tmp1.zst tmp1.out
+
+    umask 0666
+    chmod 0666 tmp1 tmp2
+
+    println "test : respect umask when copying permissions in file -> file compression "
+    zstd -f tmp1 -o tmp1.zst
+    assertFilePermissions tmp1.zst 0
+    println "test : respect umask when copying permissions in file -> file decompression "
+    chmod 0666 tmp1.zst
+    zstd -f -d tmp1.zst -o tmp1.out
+    assertFilePermissions tmp1.out 0
+
+    rm -f tmp1.zst tmp1.out
+
+    println "test : respect umask when compressing from stdin input "
+    zstd -f -o tmp1.zst < tmp1
+    assertFilePermissions tmp1.zst 0
+    println "test : respect umask when decompressing from stdin input "
+    chmod 0666 tmp1.zst
+    zstd -f -d -o tmp1.out < tmp1.zst
+    assertFilePermissions tmp1.out 0
+
+    rm -f tmp1 tmp2 tmp1.zst tmp2.zst tmp1.out tmp2.out
+    umask $ORIGINAL_UMASK
+fi
 
 if [ -n "$DEVNULLRIGHTS" ] ; then
     # these tests requires sudo rights, which is uncommon.
@@ -401,6 +592,33 @@ if [ -n "$DEVNULLRIGHTS" ] ; then
     ls -las $INTOVOID | grep "rw-rw-rw-"
 fi
 
+if [ -n "$READFROMBLOCKDEVICE" ] ; then
+    # This creates a temporary block device, which is only possible on unix-y
+    # systems, is somewhat invasive, and requires sudo. For these reasons, you
+    # have to specifically ask for this test.
+    println "\n===> checking that zstd can read from a block device"
+    datagen -g65536 > tmp.img
+    sudo losetup -fP tmp.img
+    LOOP_DEV=$(losetup -a | grep 'tmp\.img' | cut -f1 -d:)
+    [ -z "$LOOP_DEV" ] && die "failed to get loopback device"
+    sudoZstd $LOOP_DEV -c > tmp.img.zst && die "should fail without -f"
+    sudoZstd -f $LOOP_DEV -c > tmp.img.zst
+    zstd -d tmp.img.zst -o tmp.img.copy
+    sudo losetup -d $LOOP_DEV
+    $DIFF -s tmp.img tmp.img.copy || die "round trip failed"
+    rm -f tmp.img tmp.img.zst tmp.img.copy
+fi
+
+println "\n===>  zstd created file timestamp tests"
+datagen > tmp
+touch -m -t 200001010000.00 tmp
+println "test : copy mtime in file -> file compression "
+zstd -f tmp -o tmp.zst
+assertSameMTime tmp tmp.zst
+println "test : copy mtime in file -> file decompression "
+zstd -f -d tmp.zst -o tmp.out
+assertSameMTime tmp.zst tmp.out
+rm -f tmp
 
 println "\n===>  compress multiple files into an output directory, --output-dir-flat"
 println henlo > tmp1
@@ -425,6 +643,37 @@ test -f tmpOutDirDecomp/tmp2
 test -f tmpOutDirDecomp/tmp1
 rm -rf tmp*
 
+if [ "$isWindows" = false ] ; then
+    println "\n===>  compress multiple files into an output directory and mirror input folder, --output-dir-mirror"
+    println "test --output-dir-mirror" > tmp1
+    mkdir -p tmpInputTestDir/we/.../..must/go/deeper..
+    println cool > tmpInputTestDir/we/.../..must/go/deeper../tmp2
+    zstd tmp1 -r tmpInputTestDir --output-dir-mirror tmpOutDir
+    test -f tmpOutDir/tmp1.zst
+    test -f tmpOutDir/tmpInputTestDir/we/.../..must/go/deeper../tmp2.zst
+
+    println "test: compress input dir will be ignored if it has '..'"
+    zstd  -r tmpInputTestDir/we/.../..must/../..mustgo/deeper.. --output-dir-mirror non-exist && die "input cannot contain '..'"
+    zstd  -r tmpInputTestDir/we/.../..must/deeper../.. --output-dir-mirror non-exist && die "input cannot contain '..'"
+    zstd  -r ../tests/tmpInputTestDir/we/.../..must/deeper.. --output-dir-mirror non-exist && die "input cannot contain '..'"
+    test ! -d non-exist
+
+    println "test: compress input dir should succeed with benign uses of '..'"
+    zstd  -r tmpInputTestDir/we/.../..must/go/deeper.. --output-dir-mirror tmpout
+    test -d tmpout
+
+    println "test : decompress multiple files into an output directory, --output-dir-mirror"
+    zstd tmpOutDir -r -d --output-dir-mirror tmpOutDirDecomp
+    test -f tmpOutDirDecomp/tmpOutDir/tmp1
+    test -f tmpOutDirDecomp/tmpOutDir/tmpInputTestDir/we/.../..must/go/deeper../tmp2
+
+    println "test: decompress input dir will be ignored if it has '..'"
+    zstd  -r tmpOutDir/tmpInputTestDir/we/.../..must/../..must --output-dir-mirror non-exist && die "input cannot contain '..'"
+    test ! -d non-exist
+
+    rm -rf tmp*
+fi
+
 
 println "test : compress multiple files reading them from a file, --filelist=FILE"
 println "Hello world!, file1" > tmp1
@@ -432,6 +681,11 @@ println "Hello world!, file2" > tmp2
 println tmp1 > tmp_fileList
 println tmp2 >> tmp_fileList
 zstd -f --filelist=tmp_fileList
+test -f tmp2.zst
+test -f tmp1.zst
+
+println "test : alternate syntax: --filelist FILE"
+zstd -f --filelist tmp_fileList
 test -f tmp2.zst
 test -f tmp1.zst
 
@@ -472,6 +726,10 @@ test -f tmp2
 test -f tmp3
 test -f tmp4
 
+println "test : survive the list of files with too long filenames (--filelist=FILE)"
+datagen -g5M > tmp_badList
+zstd -f --filelist=tmp_badList && die "should have failed : file name length is too long"
+
 println "test : survive a list of files which is text garbage (--filelist=FILE)"
 datagen > tmp_badList
 zstd -f --filelist=tmp_badList && die "should have failed : list is text garbage"
@@ -502,6 +760,7 @@ rm -rf tmp*
 println "test : show-default-cparams regular"
 datagen > tmp
 zstd --show-default-cparams -f tmp
+zstd --show-default-cparams -d tmp.zst && die "error: can't use --show-default-cparams in decompression mode"
 rm -rf tmp*
 
 println "test : show-default-cparams recursive"
@@ -510,6 +769,13 @@ datagen -g15000 > tmp_files/tmp1
 datagen -g129000 > tmp_files/tmp2
 datagen -g257000 > tmp_files/tmp3
 zstd --show-default-cparams -f -r tmp_files
+rm -rf tmp*
+
+println "test : show compression parameters in verbose mode"
+datagen > tmp
+zstd -vv tmp 2>&1 | \
+grep -q -E -- "--zstd=wlog=[[:digit:]]+,clog=[[:digit:]]+,hlog=[[:digit:]]+,\
+slog=[[:digit:]]+,mml=[[:digit:]]+,tlen=[[:digit:]]+,strat=[[:digit:]]+"
 rm -rf tmp*
 
 println "\n===>  Advanced compression parameters "
@@ -540,6 +806,9 @@ println "world!" > world.tmp
 cat hello.tmp world.tmp > helloworld.tmp
 zstd -c hello.tmp > hello.zst
 zstd -c world.tmp > world.zst
+zstd -c hello.tmp world.tmp > helloworld.zst
+zstd -dc helloworld.zst > result.tmp
+$DIFF helloworld.tmp result.tmp
 cat hello.zst world.zst > helloworld.zst
 zstd -dc helloworld.zst > result.tmp
 cat result.tmp
@@ -557,20 +826,20 @@ $DIFF helloworld.tmp result.tmp
 ln -s helloworld.zst helloworld.link.zst
 $EXE_PREFIX ./zstdcat helloworld.link.zst > result.tmp
 $DIFF helloworld.tmp result.tmp
-rm zstdcat
-rm result.tmp
+rm -f zstdcat
+rm -f result.tmp
 println "testing zcat symlink"
 ln -sf "$ZSTD_BIN" zcat
 $EXE_PREFIX ./zcat helloworld.zst > result.tmp
 $DIFF helloworld.tmp result.tmp
 $EXE_PREFIX ./zcat helloworld.link.zst > result.tmp
 $DIFF helloworld.tmp result.tmp
-rm zcat
-rm ./*.tmp ./*.zstd
+rm -f zcat
+rm -f ./*.tmp ./*.zstd
 println "frame concatenation tests completed"
 
 
-if [ "$isWindows" = false ] && [ "$UNAME" != 'SunOS' ] && [ "$UNAME" != "OpenBSD" ] ; then
+if [ "$isWindows" = false ] && [ "$UNAME" != 'SunOS' ] && [ "$UNAME" != "OpenBSD" ] && [ "$UNAME" != "AIX" ]; then
 println "\n**** flush write error test **** "
 
 println "println foo | zstd > /dev/full"
@@ -628,7 +897,7 @@ zstd -d -v -f tmpSparseCompressed -o tmpSparseRegenerated
 zstd -d -v -f tmpSparseCompressed -c >> tmpSparseRegenerated
 ls -ls tmpSparse*  # look at file size and block size on disk
 $DIFF tmpSparse2M tmpSparseRegenerated
-rm tmpSparse*
+rm -f tmpSparse*
 
 
 println "\n===>  stream-size mode"
@@ -641,7 +910,7 @@ if [ "$stream_size" -gt "$file_size" ]; then
   die "hinted compression larger than expected"
 fi
 println "test : sized streaming compression and decompression"
-cat tmp | zstd -14 -f tmp -o --stream-size=11000 tmp.zst
+cat tmp | zstd -14 -f tmp -o tmp.zst --stream-size=11000
 zstd -df tmp.zst -o tmp_decompress
 cmp tmp tmp_decompress || die "difference between original and decompressed file"
 println "test : incorrect stream size"
@@ -692,11 +961,23 @@ cat tmp | zstd -14 -f --size-hint=11050 | zstd -t  # slightly too high
 cat tmp | zstd -14 -f --size-hint=10950 | zstd -t  # slightly too low
 cat tmp | zstd -14 -f --size-hint=22000 | zstd -t  # considerably too high
 cat tmp | zstd -14 -f --size-hint=5500  | zstd -t  # considerably too low
+println "test : allows and interprets K,KB,KiB,M,MB and MiB suffix"
+cat tmp | zstd -14 -f --size-hint=11K | zstd -t
+cat tmp | zstd -14 -f --size-hint=11KB | zstd -t
+cat tmp | zstd -14 -f --size-hint=11KiB | zstd -t
+cat tmp | zstd -14 -f --size-hint=1M  | zstd -t
+cat tmp | zstd -14 -f --size-hint=1MB  | zstd -t
+cat tmp | zstd -14 -f --size-hint=1MiB  | zstd -t
 
 
 println "\n===>  dictionary tests "
-
-println "- test with raw dict (content only) "
+println "- Test high/low compressibility corpus training"
+datagen -g12M -P90 > tmpCorpusHighCompress
+datagen -g12M -P5 > tmpCorpusLowCompress
+zstd --train -B2K tmpCorpusHighCompress -o tmpDictHighCompress
+zstd --train -B2K tmpCorpusLowCompress -o tmpDictLowCompress
+rm -f tmpCorpusHighCompress tmpCorpusLowCompress tmpDictHighCompress tmpDictLowCompress
+println "- Test with raw dict (content only) "
 datagen > tmpDict
 datagen -g1M | $MD5SUM > tmp1
 datagen -g1M | zstd -D tmpDict | zstd -D tmpDict -dvq | $MD5SUM > tmp2
@@ -711,10 +992,17 @@ println "- Dictionary compression roundtrip"
 zstd -f tmp -D tmpDict
 zstd -d tmp.zst -D tmpDict -fo result
 $DIFF "$TESTFILE" result
+println "- Dictionary compression with hlog < clog"
+zstd -6f tmp -D tmpDict --zstd=clog=25,hlog=23
 println "- Dictionary compression with btlazy2 strategy"
 zstd -f tmp -D tmpDict --zstd=strategy=6
 zstd -d tmp.zst -D tmpDict -fo result
 $DIFF "$TESTFILE" result
+if [ -e /proc/self/fd/0 ]; then
+    println "- Test rejecting irregular dictionary file"
+    cat tmpDict | zstd -f tmp -D /proc/self/fd/0 && die "Piped dictionary should fail!"
+    cat tmpDict | zstd -d tmp.zst -D /proc/self/fd/0 -f && die "Piped dictionary should fail!"
+fi
 if [ -n "$hasMT" ]
 then
     println "- Test dictionary compression with multithreading "
@@ -738,8 +1026,6 @@ println "- Compress without dictID"
 zstd -f tmp -D tmpDict1 --no-dictID
 zstd -d tmp.zst -D tmpDict -fo result
 $DIFF "$TESTFILE" result
-println "- Compress with wrong argument order (must fail)"
-zstd tmp -Df tmpDict1 -c > $INTOVOID && die "-D must be followed by dictionary name "
 println "- Compress multiple files with dictionary"
 rm -rf dirTestDict
 mkdir dirTestDict
@@ -765,17 +1051,20 @@ zstd -o tmpDict --train "$TESTDIR"/*.c "$PRGDIR"/*.c
 test -f tmpDict
 zstd --train "$TESTDIR"/*.c "$PRGDIR"/*.c
 test -f dictionary
-println "- Test dictionary training fails"
-echo "000000000000000000000000000000000" > tmpz
-zstd --train tmpz tmpz tmpz tmpz tmpz tmpz tmpz tmpz tmpz && die "Dictionary training should fail : source is all zeros"
 if [ -n "$hasMT" ]
 then
-  zstd --train -T0 tmpz tmpz tmpz tmpz tmpz tmpz tmpz tmpz tmpz && die "Dictionary training should fail : source is all zeros"
   println "- Create dictionary with multithreading enabled"
   zstd --train -T0 "$TESTDIR"/*.c "$PRGDIR"/*.c -o tmpDict
 fi
-rm tmp* dictionary
+rm -f tmp* dictionary
 
+println "- Test --memory for dictionary compression"
+datagen -g12M -P90 > tmpCorpusHighCompress
+zstd --train -B2K tmpCorpusHighCompress -o tmpDictHighCompress --memory=10K && die "Dictionary training should fail : --memory too low (10K)"
+zstd --train -B2K tmpCorpusHighCompress -o tmpDictHighCompress --memory=5MB 2> zstTrainWithMemLimitStdErr
+cat zstTrainWithMemLimitStdErr | grep "setting manual memory limit for dictionary training data at 5 MB"
+cat zstTrainWithMemLimitStdErr | grep "Training samples set too large (12 MB); training on 5 MB only..."
+rm zstTrainWithMemLimitStdErr
 
 println "\n===>  fastCover dictionary builder : advanced options "
 TESTFILE="$PRGDIR"/zstdcli.c
@@ -797,6 +1086,7 @@ println "- Create dictionaries with shrink-dict flag enabled"
 zstd --train-fastcover=steps=1,shrink "$TESTDIR"/*.c "$PRGDIR"/*.c -o tmpShrinkDict
 zstd --train-fastcover=steps=1,shrink=1 "$TESTDIR"/*.c "$PRGDIR"/*.c -o tmpShrinkDict1
 zstd --train-fastcover=steps=1,shrink=5 "$TESTDIR"/*.c "$PRGDIR"/*.c -o tmpShrinkDict2
+zstd --train-fastcover=shrink=5,steps=1 "$TESTDIR"/*.c "$PRGDIR"/*.c -o tmpShrinkDict3
 println "- Create dictionary with size limit"
 zstd --train-fastcover=steps=1 "$TESTDIR"/*.c "$PRGDIR"/*.c -o tmpDict2 --maxdict=4K
 println "- Create dictionary using all samples for both training and testing"
@@ -816,7 +1106,7 @@ zstd -o tmpDict --train-fastcover=k=56,d=8 "$TESTDIR"/*.c "$PRGDIR"/*.c
 test -f tmpDict
 zstd --train-fastcover=k=56,d=8 "$TESTDIR"/*.c "$PRGDIR"/*.c
 test -f dictionary
-rm tmp* dictionary
+rm -f tmp* dictionary
 
 
 println "\n===>  legacy dictionary builder "
@@ -844,7 +1134,7 @@ zstd -o tmpDict --train-legacy "$TESTDIR"/*.c "$PRGDIR"/*.c
 test -f tmpDict
 zstd --train-legacy "$TESTDIR"/*.c "$PRGDIR"/*.c
 test -f dictionary
-rm tmp* dictionary
+rm -f tmp* dictionary
 
 
 println "\n===>  integrity tests "
@@ -873,8 +1163,9 @@ datagen | zstd -c | zstd -t
 
 println "\n===>  golden files tests "
 
-zstd -t -r "$TESTDIR/golden-compression"
+zstd -t -r "$TESTDIR/golden-decompression"
 zstd -c -r "$TESTDIR/golden-compression" | zstd -t
+zstd -D "$TESTDIR/golden-dictionaries/http-dict-missing-symbols" "$TESTDIR/golden-compression/http" -c | zstd -D "$TESTDIR/golden-dictionaries/http-dict-missing-symbols" -t
 
 
 println "\n===>  benchmark mode tests "
@@ -915,7 +1206,7 @@ if [ $GZIPMODE -eq 1 ]; then
         gzip -t -v tmp.gz
         gzip -f tmp
         zstd -d -f -v tmp.gz
-        rm tmp*
+        rm -f tmp*
     else
         println "gzip binary not detected"
     fi
@@ -932,7 +1223,7 @@ if [ $GZIPMODE -eq 1 ]; then
     zstd -f tmp
     cat tmp.gz tmp.zst tmp.gz tmp.zst | zstd -d -f -o tmp
     truncateLastByte tmp.gz | zstd -t > $INTOVOID && die "incomplete frame not detected !"
-    rm tmp*
+    rm -f tmp*
 else
     println "gzip mode not supported"
 fi
@@ -963,7 +1254,7 @@ if [ $LZMAMODE -eq 1 ]; then
         lzma -Q -f -k --lzma1 tmp
         zstd -d -f -v tmp.xz
         zstd -d -f -v tmp.lzma
-        rm tmp*
+        rm -f tmp*
         println "Creating symlinks"
         ln -s "$ZSTD_BIN" ./xz
         ln -s "$ZSTD_BIN" ./unxz
@@ -980,8 +1271,8 @@ if [ $LZMAMODE -eq 1 ]; then
         ./xz -d tmp.xz
         lzma -Q tmp
         ./lzma -d tmp.lzma
-        rm xz unxz lzma unlzma
-        rm tmp*
+        rm -f xz unxz lzma unlzma
+        rm -f tmp*
     else
         println "xz binary not detected"
     fi
@@ -1000,7 +1291,7 @@ if [ $LZMAMODE -eq 1 ]; then
     cat tmp.xz tmp.lzma tmp.zst tmp.lzma tmp.xz tmp.zst | zstd -d -f -o tmp
     truncateLastByte tmp.xz | zstd -t > $INTOVOID && die "incomplete frame not detected !"
     truncateLastByte tmp.lzma | zstd -t > $INTOVOID && die "incomplete frame not detected !"
-    rm tmp*
+    rm -f tmp*
 else
     println "xz mode not supported"
 fi
@@ -1017,9 +1308,9 @@ if [ $LZ4MODE -eq 1 ]; then
         datagen > tmp
         zstd --format=lz4 -f tmp
         lz4 -t -v tmp.lz4
-        lz4 -f tmp
+        lz4 -f -m tmp   # ensure result is sent into tmp.lz4, not stdout
         zstd -d -f -v tmp.lz4
-        rm tmp*
+        rm -f tmp*
     else
         println "lz4 binary not detected"
     fi
@@ -1035,7 +1326,7 @@ if [ $LZ4MODE -eq 1 ]; then
     zstd -f tmp
     cat tmp.lz4 tmp.zst tmp.lz4 tmp.zst | zstd -d -f -o tmp
     truncateLastByte tmp.lz4 | zstd -t > $INTOVOID && die "incomplete frame not detected !"
-    rm tmp*
+    rm -f tmp*
 else
     println "\nlz4 mode not supported"
 fi
@@ -1058,35 +1349,38 @@ if [ $LZ4MODE -ne 1 ]; then
     grep ".lz4" tmplg > $INTOVOID && die "Unsupported suffix listed"
 fi
 
+touch tmp1
+zstd tmp1 -o tmp1.zstd
+zstd -d -f tmp1.zstd   # support .zstd suffix even though it's not the default suffix
 
 println "\n===>  tar extension tests "
 
-rm -f tmp tmp.tar tmp.tzst tmp.tgz tmp.txz tmp.tlz4
+rm -f tmp tmp.tar tmp.tzst tmp.tgz tmp.txz tmp.tlz4 tmp1.zstd
 
 datagen > tmp
-tar cf tmp.tar tmp
+tar -cf tmp.tar tmp
 zstd tmp.tar -o tmp.tzst
-rm tmp.tar
+rm -f tmp.tar
 zstd -d tmp.tzst
 [ -e tmp.tar ] || die ".tzst failed to decompress to .tar!"
 rm -f tmp.tar tmp.tzst
 
 if [ $GZIPMODE -eq 1 ]; then
-    tar czf tmp.tgz tmp
+    tar -f - -c tmp | gzip > tmp.tgz
     zstd -d tmp.tgz
     [ -e tmp.tar ] || die ".tgz failed to decompress to .tar!"
     rm -f tmp.tar tmp.tgz
 fi
 
 if [ $LZMAMODE -eq 1 ]; then
-    tar c tmp | zstd --format=xz > tmp.txz
+    tar -f - -c tmp | zstd --format=xz > tmp.txz
     zstd -d tmp.txz
     [ -e tmp.tar ] || die ".txz failed to decompress to .tar!"
     rm -f tmp.tar tmp.txz
 fi
 
 if [ $LZ4MODE -eq 1 ]; then
-    tar c tmp | zstd --format=lz4 > tmp.tlz4
+    tar -f - -c tmp | zstd --format=lz4 > tmp.tlz4
     zstd -d tmp.tlz4
     [ -e tmp.tar ] || die ".tlz4 failed to decompress to .tar!"
     rm -f tmp.tar tmp.tlz4
@@ -1117,6 +1411,7 @@ roundTripTest -g1000K "1 --single-thread --long"
 roundTripTest -g517K "6 --single-thread --long"
 roundTripTest -g516K "16 --single-thread --long"
 roundTripTest -g518K "19 --single-thread --long"
+roundTripTest -g2M "22 --single-thread --ultra --long"
 fileRoundTripTest -g5M "3 --single-thread --long"
 
 
@@ -1125,12 +1420,28 @@ if [ -n "$hasMT" ]
 then
     println "\n===>  zstdmt round-trip tests "
     roundTripTest -g4M "1 -T0"
+    roundTripTest -g4M "1 -T0 --auto-threads=physical"
+    roundTripTest -g4M "1 -T0 --auto-threads=logical"
     roundTripTest -g8M "3 -T2"
+    roundTripTest -g8M "19 --long"
     roundTripTest -g8000K "2 --threads=2"
     fileRoundTripTest -g4M "19 -T2 -B1M"
 
     println "\n===>  zstdmt long distance matching round-trip tests "
     roundTripTest -g8M "3 --long=24 -T2"
+
+    println "\n===>  zstdmt environment variable tests "
+    echo "multifoo" >> mt_tmp
+    ZSTD_NBTHREADS=-3 zstd -f mt_tmp # negative value, warn and revert to default setting
+    ZSTD_NBTHREADS=''  zstd -f mt_tmp # empty env var, warn and revert to default setting
+    ZSTD_NBTHREADS=-   zstd -f mt_tmp # malformed env var, warn and revert to default setting
+    ZSTD_NBTHREADS=a   zstd -f mt_tmp # malformed env var, warn and revert to default setting
+    ZSTD_NBTHREADS=+a  zstd -f mt_tmp # malformed env var, warn and revert to default setting
+    ZSTD_NBTHREADS=3a7 zstd -f mt_tmp # malformed env var, warn and revert to default setting
+    ZSTD_NBTHREADS=50000000000 zstd -f mt_tmp # numeric value too large, warn and revert to default setting=
+    ZSTD_NBTHREADS=2  zstd -f mt_tmp # correct usage
+    ZSTD_NBTHREADS=1  zstd -f mt_tmp # correct usage: single thread
+    rm -f mt_tmp*
 
     println "\n===>  ovLog tests "
     datagen -g2MB > tmp
@@ -1154,7 +1465,7 @@ else
     println "\n===>  no multithreading, skipping zstdmt tests "
 fi
 
-rm tmp*
+rm -f tmp*
 
 println "\n===>  zstd --list/-l single frame tests "
 datagen > tmp1
@@ -1187,9 +1498,9 @@ zstd -f $TEST_DATA_FILE -o $FULL_COMPRESSED_FILE
 dd bs=1 count=100 if=$FULL_COMPRESSED_FILE of=$TRUNCATED_COMPRESSED_FILE
 zstd --list $TRUNCATED_COMPRESSED_FILE && die "-l must fail on truncated file"
 
-rm $TEST_DATA_FILE
-rm $FULL_COMPRESSED_FILE
-rm $TRUNCATED_COMPRESSED_FILE
+rm -f $TEST_DATA_FILE
+rm -f $FULL_COMPRESSED_FILE
+rm -f $TRUNCATED_COMPRESSED_FILE
 
 println "\n===>  zstd --list/-l errors when presented with stdin / no files"
 zstd -l && die "-l must fail on empty list of files"
@@ -1205,7 +1516,7 @@ datagen -g0 > tmp5
 zstd tmp5
 zstd -l tmp5.zst
 zstd -l tmp5* && die "-l must fail on non-zstd file"
-zstd -lv tmp5.zst | grep "Decompressed Size: 0.00 KB (0 B)"  # check that 0 size is present in header
+zstd -lv tmp5.zst | grep "Decompressed Size: 0 B (0 B)"  # check that 0 size is present in header
 zstd -lv tmp5* && die "-l must fail on non-zstd file"
 
 println "\n===>  zstd --list/-l test with no content size field "
@@ -1218,7 +1529,22 @@ zstd -f --no-check tmp1
 zstd -l tmp1.zst
 zstd -lv tmp1.zst
 
-rm tmp*
+println "\n===>  zstd trace tests "
+zstd -f --trace tmp.trace tmp1
+zstd -f --trace tmp.trace tmp1 tmp2 tmp3
+zstd -f --trace tmp.trace tmp1 tmp2 tmp3 -o /dev/null
+zstd -f --trace tmp.trace tmp1 tmp2 tmp3 --single-thread
+zstd -f --trace tmp.trace -D tmp1 tmp2 tmp3 -o /dev/null
+zstd -f --trace tmp.trace -D tmp1 tmp2 tmp3 -o /dev/null --single-thread
+zstd --trace tmp.trace -t tmp1.zst
+zstd --trace tmp.trace -t tmp1.zst tmp2.zst
+zstd -f --trace tmp.trace -d tmp1.zst
+zstd -f --trace tmp.trace -d tmp1.zst tmp2.zst tmp3.zst
+zstd -D tmp1 tmp2 -c | zstd --trace tmp.trace -t -D tmp1
+zstd -b1e10i0 --trace tmp.trace tmp1
+zstd -b1e10i0 --trace tmp.trace tmp1 tmp2 tmp3
+
+rm -f tmp*
 
 
 println "\n===>   zstd long distance matching tests "
@@ -1231,6 +1557,23 @@ roundTripTest -g1M -P50 "1 --single-thread --long=29" " --long=28 --memory=512MB
 roundTripTest -g1M -P50 "1 --single-thread --long=29" " --zstd=wlog=28 --memory=512MB"
 
 
+println "\n===>  zstd long distance matching with optimal parser compressed size tests "
+optCSize16=$(datagen -g511K | zstd -16 -c | wc -c)
+longCSize16=$(datagen -g511K | zstd -16 --long -c | wc -c)
+optCSize19=$(datagen -g2M | zstd -19 -c | wc -c)
+longCSize19=$(datagen -g2M | zstd -19 --long -c | wc -c)
+optCSize19wlog23=$(datagen -g2M | zstd -19 -c  --zstd=wlog=23 | wc -c)
+longCSize19wlog23=$(datagen -g2M | zstd -19 -c --long=23 | wc -c)
+if [ "$longCSize16" -gt "$optCSize16" ]; then
+    echo using --long on compression level 16 should not cause compressed size regression
+    exit 1
+elif [ "$longCSize19" -gt "$optCSize19" ]; then
+    echo using --long on compression level 19 should not cause compressed size regression
+    exit 1
+elif [ "$longCSize19wlog23" -gt "$optCSize19wlog23" ]; then
+    echo using --long on compression level 19 with wLog=23 should not cause compressed size regression
+    exit 1
+fi
 
 
 if [ "$1" != "--test-large-data" ]; then
@@ -1247,8 +1590,10 @@ then
     println "\n===>   adaptive mode "
     roundTripTest -g270000000 " --adapt"
     roundTripTest -g27000000 " --adapt=min=1,max=4"
+    roundTripTest -g27000000 " --adapt=min=-2,max=-1"
     println "===>   test: --adapt must fail on incoherent bounds "
     datagen > tmp
+    zstd --adapt= tmp && die "invalid compression parameter"
     zstd -f -vv --adapt=min=10,max=9 tmp && die "--adapt must fail on incoherent bounds"
 
     println "\n===>   rsyncable mode "
@@ -1258,17 +1603,20 @@ then
     zstd -f -vv --rsyncable --single-thread tmp && die "--rsyncable must fail with --single-thread"
 fi
 
-println "\n===> patch-from tests"
-
+println "\n===> patch-from=origin tests"
 datagen -g1000 -P50 > tmp_dict
 datagen -g1000 -P10 > tmp_patch
 zstd --patch-from=tmp_dict tmp_patch -o tmp_patch_diff
 zstd -d --patch-from=tmp_dict tmp_patch_diff -o tmp_patch_recon
 $DIFF -s tmp_patch_recon tmp_patch
+
+println "\n===> alternate syntax: patch-from origin"
+zstd -f --patch-from tmp_dict tmp_patch -o tmp_patch_diff
+zstd -df --patch-from tmp_dict tmp_patch_diff -o tmp_patch_recon
+$DIFF -s tmp_patch_recon tmp_patch
 rm -rf tmp_*
 
 println "\n===> patch-from recursive tests"
-
 mkdir tmp_dir
 datagen > tmp_dir/tmp1
 datagen > tmp_dir/tmp2
@@ -1277,10 +1625,24 @@ zstd --patch-from=tmp_dict -r tmp_dir && die
 rm -rf tmp*
 
 println "\n===> patch-from long mode trigger larger file test"
-
 datagen -g5000000 > tmp_dict
 datagen -g5000000 > tmp_patch
-zstd -15 --patch-from=tmp_dict tmp_patch 2>&1 | grep "long mode automaticaly triggered"
+zstd -15 --patch-from=tmp_dict tmp_patch 2>&1 | grep "long mode automatically triggered"
+rm -rf tmp*
+
+println "\n===> patch-from very large dictionary and file test"
+datagen -g550000000 -P0 > tmp_dict
+datagen -g100000000 -P1 > tmp_patch
+zstd --long=30 -1f --patch-from tmp_dict tmp_patch
+zstd --long=30 -df --patch-from tmp_dict tmp_patch.zst -o tmp_patch_recon
+$DIFF -s tmp_patch_recon tmp_patch
+rm -rf tmp*
+
+println "\n===> patch-from --stream-size test"
+datagen -g1000 -P50 > tmp_dict
+datagen -g1000 -P10 > tmp_patch
+cat tmp_patch | zstd -f --patch-from=tmp_dict -c -o tmp_patch_diff && die
+cat tmp_patch | zstd -f --patch-from=tmp_dict --stream-size=1000 -c -o tmp_patch_diff
 rm -rf tmp*
 
 println "\n===>   large files tests "
@@ -1350,6 +1712,7 @@ println "- Create first dictionary"
 zstd --train-cover=k=46,d=8,split=80 "$TESTDIR"/*.c "$PRGDIR"/*.c -o tmpDict
 cp "$TESTFILE" tmp
 zstd -f tmp -D tmpDict
+zstd -f tmp -D tmpDict --patch-from=tmpDict && die "error: can't use -D and --patch-from=#at the same time"
 zstd -d tmp.zst -D tmpDict -fo result
 $DIFF "$TESTFILE" result
 zstd --train-cover=k=56,d=8 && die "Create dictionary without input file (should error)"
@@ -1360,6 +1723,7 @@ println "- Create dictionary using shrink-dict flag"
 zstd --train-cover=steps=256,shrink "$TESTDIR"/*.c "$PRGDIR"/*.c --dictID=1 -o tmpShrinkDict
 zstd --train-cover=steps=256,shrink=1 "$TESTDIR"/*.c "$PRGDIR"/*.c --dictID=1 -o tmpShrinkDict1
 zstd --train-cover=steps=256,shrink=5 "$TESTDIR"/*.c "$PRGDIR"/*.c --dictID=1 -o tmpShrinkDict2
+zstd --train-cover=shrink=5,steps=256 "$TESTDIR"/*.c "$PRGDIR"/*.c --dictID=1 -o tmpShrinkDict3
 println "- Create dictionary with short dictID"
 zstd --train-cover=k=46,d=8,split=80 "$TESTDIR"/*.c "$PRGDIR"/*.c --dictID=1 -o tmpDict1
 cmp tmpDict tmpDict1 && die "dictionaries should have different ID !"

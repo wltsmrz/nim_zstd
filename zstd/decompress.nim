@@ -4,6 +4,7 @@ import ./common
 when not defined(useExternalZstd):
   {.passC: "-I" & joinPathHost(dep_lib_dir, "decompress").}
   {.compile: joinPathHost(dep_lib_dir, "decompress/huf_decompress.c").}
+  {.compile: joinPathHost(dep_lib_dir, "decompress/huf_decompress_amd64.S").}
   {.compile: joinPathHost(dep_lib_dir, "decompress/zstd_ddict.c").}
   {.compile: joinPathHost(dep_lib_dir, "decompress/zstd_decompress_block.c").}
   {.compile: joinPathHost(dep_lib_dir, "decompress/zstd_decompress.c").}
