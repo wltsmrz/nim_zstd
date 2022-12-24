@@ -1,5 +1,5 @@
 import std/os
-from os {.all.} import parentDirPos # for parentDirHost
+import zstd/private/ospath
 
 proc joinPathHost*(head, tail: string): string {.noSideEffect.} =
   when not defined(mingw):
