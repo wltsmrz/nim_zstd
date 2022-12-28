@@ -1,22 +1,6 @@
 import std/streams
 import ./common
 
-when not defined(useExternalZstd):
-  {.passC: "-I" & joinPathHost(dep_lib_dir, "compress").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/fse_compress.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/hist.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/huf_compress.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_compress.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_compress_literals.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_compress_sequences.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_compress_superblock.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_double_fast.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_fast.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_lazy.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_ldm.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstdmt_compress.c").}
-  {.compile: joinPathHost(dep_lib_dir, "compress/zstd_opt.c").}
-
 {.pragma: c_dep_type, header: dep_header_name, bycopy.}
 {.pragma: c_dep_proc, importc, header: dep_header_name, cdecl.}
 {.pragma: c_dep_enum, size: sizeof(cint).}

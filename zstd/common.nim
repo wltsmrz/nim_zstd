@@ -29,21 +29,12 @@ proc parentDirHost*(path: string): string =
 
 const cur_src_path = currentSourcePath.parentDirHost
 const zstd_path {.strdefine.}: string = joinPathHost(cur_src_path, "deps/zstd")
-const dep_lib_dir* = joinPathHost(zstd_path, "lib")
 
 when defined(useExternalZstd):
   {.passL: "-lzstd".}
 else:
-  {.passC: "-I" & dep_lib_dir.}
-  {.passC: "-I" & joinPathHost(dep_lib_dir, "common").}
-  {.compile: joinPathHost(dep_lib_dir, "common/debug.c").}
-  {.compile: joinPathHost(dep_lib_dir, "common/entropy_common.c").}
-  {.compile: joinPathHost(dep_lib_dir, "common/error_private.c").}
-  {.compile: joinPathHost(dep_lib_dir, "common/fse_decompress.c").}
-  {.compile: joinPathHost(dep_lib_dir, "common/pool.c").}
-  {.compile: joinPathHost(dep_lib_dir, "common/threading.c").}
-  {.compile: joinPathHost(dep_lib_dir, "common/xxhash.c").}
-  {.compile: joinPathHost(dep_lib_dir, "common/zstd_common.c").}
+  {.passC: "-I" & zstd_path.}
+  {.compile: joinPathHost(zstd_path, "zstd.c").}
 
 let dep_header_name* {.compileTime.} = "zstd.h"
 {.pragma: c_dep_type, header: dep_header_name, bycopy.}

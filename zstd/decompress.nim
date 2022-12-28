@@ -1,13 +1,6 @@
 import std/streams
 import ./common
 
-when not defined(useExternalZstd):
-  {.passC: "-I" & joinPathHost(dep_lib_dir, "decompress").}
-  {.compile: joinPathHost(dep_lib_dir, "decompress/huf_decompress.c").}
-  {.compile: joinPathHost(dep_lib_dir, "decompress/zstd_ddict.c").}
-  {.compile: joinPathHost(dep_lib_dir, "decompress/zstd_decompress_block.c").}
-  {.compile: joinPathHost(dep_lib_dir, "decompress/zstd_decompress.c").}
-
 {.pragma: c_dep_type, header: dep_header_name, bycopy.}
 {.pragma: c_dep_proc, importc, header: dep_header_name, cdecl.}
 {.pragma: c_dep_enum, size: sizeof(cint).}
