@@ -1,0 +1,35 @@
+
+name: Test
+
+on:
+  push:
+    branches: [ develop, master ]
+  pull_request:
+    branches: [ develop, master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request_target' && github.head_ref || github.ref }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        nim:
+          - '1.4.x'
+          - '1.6.x'
+          - 'stable'
+    name: Nim ${{ matrix.nim }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: jiro4989/setup-nim-action@v1
+        with:
+          nim-version: ${{ matrix.nim }}
+      - run: nimble test
+
+
