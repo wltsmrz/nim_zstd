@@ -15,7 +15,7 @@ $ nimble install zstd
   var source = readFile("tests/files/nixon.bmp")
   var compressed = compress(source, level=3)
   var decompressed = decompress(compressed)
-  check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  assert equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
 
 ## Advanced API
@@ -46,7 +46,7 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
   var decompressed = decompress(dctx, compressed)
   discard free_context(dctx)
 
-  check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  assert equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
 
 **With dictionary**
@@ -67,7 +67,7 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
   var decompressed = decompress(dctx, compressed, dict)
   discard free_context(dctx)
 
-  check equalmem(decompressed[0].addr, source[0].addr, source.len)
+  assert equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
 
 ## Streaming
@@ -88,7 +88,7 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
   var original = bytes(readFile("tests/files/nixon.bmp"))
   var cycled = bytes(readFile("tests/files/nixon-copy.bmp"))
 
-  check equalmem(cycled[0].addr, original[0].addr, original.len)
+  assert equalmem(cycled[0].addr, original[0].addr, original.len)
 ```
 
 # Compile flags
