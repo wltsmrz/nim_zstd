@@ -12,7 +12,7 @@ $ nimble install zstd
   import zstd/compress
   import zstd/decompress
 
-  var source = readFile("tests/files/nixon.bmp")
+  var source = readFile("tests/files/gdp.json")
   var compressed = compress(source, level=3)
   var decompressed = decompress(compressed)
   assert equalmem(decompressed[0].addr, source[0].addr, source.len)
@@ -36,7 +36,7 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
   import zstd/compress
   import zstd/decompress
 
-  var source = readFile("tests/files/nixon.bmp")
+  var source = readFile("tests/files/gdp.json")
 
   var cctx = new_compress_context()
   var compressed = compress(cctx, source, level=3)
@@ -56,8 +56,8 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
   import zstd/compress
   import zstd/decompress
 
-  var source = bytes(readFile("tests/files/nixon.bmp"))
-  var dict = bytes(readFile("tests/files/nixon.dict"))
+  var source = bytes(readFile("tests/files/gdp.json"))
+  var dict = bytes(readFile("tests/files/gdp.dict"))
 
   var cctx = new_compress_context()
   var compressed = compress(cctx, source, dict, level=3)
@@ -73,20 +73,20 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
 ## Streaming
 
 ```nim
-  var c_in_stream = newFileStream("tests/files/nixon.bmp", fmRead)
-  var c_out_stream = newFileStream("tests/files/nixon-copy.bmp.zst", fmWrite)
+  var c_in_stream = newFileStream("tests/files/gdp.json", fmRead)
+  var c_out_stream = newFileStream("tests/files/gdp-copy.json.zst", fmWrite)
 
-  # compress nixon.bmp to nixon-copy.bmp.zst with level 3
+  # compress gdp.json to gdp-copy.json.zst with level 3
   compress(c_in_stream, c_out_stream, level=3)
 
-  var d_in_stream = newFileStream("tests/files/nixon-copy.bmp.zst", fmRead)
-  var d_out_stream = newFileStream("tests/files/nixon-copy.bmp", fmWrite)
+  var d_in_stream = newFileStream("tests/files/gdp-copy.json.zst", fmRead)
+  var d_out_stream = newFileStream("tests/files/gdp-copy.json", fmWrite)
 
-  # decompress nixon-copy.bmp.zst to nixon-copy.bmp
+  # decompress gdp-copy.json.zst to gdp-copy.json
   decompress(d_in_stream, d_out_stream)
 
-  var original = bytes(readFile("tests/files/nixon.bmp"))
-  var cycled = bytes(readFile("tests/files/nixon-copy.bmp"))
+  var original = bytes(readFile("tests/files/gdp.json"))
+  var cycled = bytes(readFile("tests/files/gdp-copy.json"))
 
   assert equalmem(cycled[0].addr, original[0].addr, original.len)
 ```
