@@ -3,9 +3,11 @@ import ./common
 
 {.pragma: c_dep_type, header: dep_header_name, bycopy.}
 {.pragma: c_dep_proc, importc, header: dep_header_name, cdecl.}
+{.pragma: c_dep_proc_noheader, importc, cdecl.} # skips the need for ZSTD_STATIC_LINKING_ONLY
 {.pragma: c_dep_enum, size: sizeof(cint).}
 
 proc ZSTD_getDecompressedSize*(a: ptr byte, b: csize_t): csize_t {.c_dep_proc.}
+proc ZSTD_findDecompressedSize*(a: ptr byte, b: csize_t): clonglong {.c_dep_proc_noheader.}
 proc ZSTD_getFrameContentSize*(a: ptr byte, b: csize_t): clonglong {.c_dep_proc.}
 proc ZSTD_decompress*(a: ptr byte, b: csize_t, c: ptr byte, d: csize_t): csize_t {.c_dep_proc.}
 
@@ -41,7 +43,7 @@ proc free_decompress_stream*(strm: ptr ZSTD_DStream): csize_t =
 proc decompress*(src: sink openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
-  let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
+  let dst_cap = ZSTD_findDecompressedSize(src_ptr, src_cap)
   case dst_cap:
     of ZSTD_CONTENTSIZE_UNKNOWN:
       assert(false, "ZSTD_CONTENTSIZE_UNKNOWN")
@@ -57,7 +59,7 @@ proc decompress*(src: sink openArray[byte]): seq[byte] =
 proc decompress*(ctx: ptr ZSTD_DCtx, src: sink openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
-  let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
+  let dst_cap = ZSTD_findDecompressedSize(src_ptr, src_cap)
   case dst_cap:
     of ZSTD_CONTENTSIZE_UNKNOWN:
       assert(false, "ZSTD_CONTENTSIZE_UNKNOWN")
@@ -73,7 +75,7 @@ proc decompress*(ctx: ptr ZSTD_DCtx, src: sink openArray[byte]): seq[byte] =
 proc decompress*(ctx: ptr ZSTD_DCtx, src: openArray[byte], dict: openArray[byte]): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
   let src_cap = cast[csize_t](src.len)
-  let dst_cap = ZSTD_getFrameContentSize(src_ptr, src_cap)
+  let dst_cap = ZSTD_findDecompressedSize(src_ptr, src_cap)
   case dst_cap:
     of ZSTD_CONTENTSIZE_UNKNOWN:
       assert(false, "ZSTD_CONTENTSIZE_UNKNOWN")
