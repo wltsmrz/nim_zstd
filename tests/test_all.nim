@@ -119,6 +119,30 @@ test "Manual compress stream":
   check cycled.len == original.len
   check equalmem(cycled[0].addr, original[0].addr, original.len)
 
+test "Manual decompress stream":
+  var original = readFile("tests/files/gdp.json")
+  var compressed = readFile("tests/files/gdp.zst")
+
+  block: # pull in uneven chunk sizes, explicit close
+    var dec_strm = new_decompress_stream(newStringStream(compressed))
+    var cycled = ""
+    var chunk = 1
+    while not dec_strm.atEnd():
+      cycled.add dec_strm.readStr(chunk)
+      chunk = chunk * 3 + 1
+    dec_strm.close()
+    check cycled.len == original.len
+    check equalmem(cycled[0].addr, original[0].addr, original.len)
+
+  block: # read past the end, close via destructor
+    var cycled: seq[byte]
+    block:
+      var dec_strm = new_decompress_stream(newStringStream(compressed))
+      cycled = dec_strm.read(original.len * 2)
+      check dec_strm.read(100).len == 0
+    check cycled.len == original.len
+    check equalmem(cycled[0].addr, original[0].addr, original.len)
+
 test "Large synthetic data":
   # ~32 MiB spanning hundreds of internal 128 KiB blocks: first half random
   # (incompressible, compressed output larger than input), second half

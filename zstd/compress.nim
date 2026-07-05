@@ -4,24 +4,25 @@ import ./common
 {.pragma: c_dep_type, header: dep_header_name, bycopy.}
 {.pragma: c_dep_proc, importc, header: dep_header_name, cdecl.}
 {.pragma: c_dep_enum, size: sizeof(cint).}
+{.pragma: c_dep_opaque, header: dep_header_name, incompleteStruct.}
 
 proc ZSTD_minCLevel*(): cint {.c_dep_proc.}
 proc ZSTD_maxCLevel*(): cint {.c_dep_proc.}
 proc ZSTD_compressBound*(a: csize_t): csize_t {.c_dep_proc.}
 proc ZSTD_compress*(a: ptr byte, b: csize_t, c: ptr byte, d: csize_t, e: cint): csize_t {.c_dep_proc.}
 
-type ZSTD_CCtx* {.c_dep_type.} = object
+type ZSTD_CCtx* {.c_dep_opaque.} = object
 proc ZSTD_createCCtx*(): ptr ZSTD_CCtx {.c_dep_proc.}
 proc ZSTD_freeCCtx*(a: ptr ZSTD_CCtx): csize_t {.c_dep_proc.}
 proc ZSTD_compressCCtx*(a: ptr ZSTD_CCtx, b: ptr byte, c: csize_t, d: ptr byte, e: csize_t, f: cint): csize_t {.c_dep_proc.}
 proc ZSTD_compress_usingDict*(a: ptr ZSTD_CCtx, b: ptr byte, c: csize_t, d: ptr byte, e: csize_t, f: ptr byte, g: csize_t, h: cint): csize_t {.c_dep_proc.}
 
-type ZSTD_CDict* {.c_dep_type.} = object
+type ZSTD_CDict* {.c_dep_opaque.} = object
 proc ZSTD_createCDict*(a: ptr byte, b: csize_t, c: cint): ptr ZSTD_CDict {.c_dep_proc.}
 proc ZSTD_freeCDict*(a: ptr ZSTD_CDict): csize_t {.c_dep_proc.}
 proc ZSTD_compressUsingCDict*(a: ptr ZSTD_CCtx, b: ptr byte, c: csize_t, d: ptr byte, e: csize_t, f: ptr ZSTD_CDict): csize_t {.c_dep_proc.}
 
-type ZSTD_CStream* {.c_dep_type.} = object
+type ZSTD_CStream* {.c_dep_opaque.} = object
 proc ZSTD_createCStream*(): ptr ZSTD_CStream {.c_dep_proc.}
 proc ZSTD_freeCStream*(a: ptr ZSTD_CStream): csize_t {.c_dep_proc.}
 proc ZSTD_CStreamInSize*(): csize_t {.c_dep_proc.}
@@ -163,4 +164,3 @@ proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, level: int = 3): seq[byte] 
 
 proc compress*(ctx: ptr ZSTD_CCtx, src: sink string, dict: sink string, level: int = 3): seq[byte] {.inline.} =
   compress(ctx, toOpenArrayByte(src, 0, len(src)-1), toOpenArrayByte(dict, 0, len(dict)-1), level)
-
