@@ -1,2 +1,5 @@
 *.bmp
 *.zst
+/tests/files/gdp-copy.json
+/tests/files/gdp-manual.json
+/tests/test_all
