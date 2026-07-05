@@ -133,7 +133,6 @@ proc read*(strm: var DecompressStream, n: int): seq[byte] =
   while cmp_output.pos < cmp_output.size:
     if strm.in_buf.pos >= strm.in_buf.size:
       if strm.in_stream.atEnd():
-        assert(strm.frame_progress == 0, "zstd decompress input ended mid-frame, input is truncated")
         break
       let bytes_read = strm.in_stream.readData(strm.src_buf[0].addr, strm.src_buf.len)
       strm.in_buf = ZSTD_inBuffer(src: strm.src_buf[0].addr, size: cast[csize_t](bytes_read), pos: cast[csize_t](0))
@@ -141,6 +140,8 @@ proc read*(strm: var DecompressStream, n: int): seq[byte] =
     if ZSTD_isError(res):
       assert(false, $ZSTD_getErrorName(res))
     strm.frame_progress = res
+  if strm.atEnd():
+    assert(strm.frame_progress == 0, "zstd decompress input ended mid-frame, input is truncated")
   result.setLen(cmp_output.pos.int)
 
 proc readStr*(strm: var DecompressStream, n: int): string =

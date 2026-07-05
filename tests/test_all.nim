@@ -1,6 +1,7 @@
 import os
 import random
 import streams
+import strutils
 import unittest
 import ../zstd/compress
 import ../zstd/decompress
@@ -142,6 +143,60 @@ test "Manual decompress stream":
       check dec_strm.read(100).len == 0
     check cycled.len == original.len
     check equalmem(cycled[0].addr, original[0].addr, original.len)
+
+test "Manual decompress stream rejects mid-frame EOF":
+  let original = repeat("a", 1_000_000)
+  let compressed = cast[string](compress(original))
+  let truncated = compressed[0 ..< compressed.len div 2]
+  var dec_strm = newDecompressStream(newStringStream(truncated))
+  var raised = false
+
+  try:
+    while not dec_strm.atEnd():
+      discard dec_strm.readStr(ZSTD_DStreamOutSize().int)
+  except AssertionDefect:
+    raised = true
+  finally:
+    dec_strm.close()
+
+  check raised
+
+test "Decompress stream wrapper rejects mid-frame EOF":
+  let original = repeat("a", 1_000_000)
+  let compressed = cast[string](compress(original))
+  let truncated = compressed[0 ..< compressed.len div 2]
+  var raised = false
+
+  try:
+    decompress(newStringStream(truncated), newStringStream())
+  except AssertionDefect:
+    raised = true
+
+  check raised
+
+test "Compress stream explicit close reports write errors":
+  
+  type FailingWriteStream = ref object of StreamObj
+  
+  proc newFailingWriteStream(): FailingWriteStream =
+    
+    proc failingWriteData(s: Stream, buffer: pointer, bufLen: int) =
+      raise newException(IOError, "simulated write failure")
+    
+    proc failingFlush(s: Stream) =
+      discard
+    
+    proc failingClose(s: Stream) =
+      discard
+
+    new(result)
+    result.writeDataImpl = failingWriteData
+    result.flushImpl = failingFlush
+    result.closeImpl = failingClose
+
+  var cmp_strm = newCompressStream(newFailingWriteStream(), level=3)
+  expect IOError:
+    cmp_strm.close()
 
 test "Large synthetic data":
   # ~32 MiB spanning hundreds of internal 128 KiB blocks: first half random
