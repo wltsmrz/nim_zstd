@@ -5,4 +5,4 @@ license = "MIT"
 skipDirs = @["examples"]
 skipFiles = @["README.md"]
 installDirs = @["zstd"]
-requires "nim >= 1.2.0"
+requires "nim >= 1.4.2"

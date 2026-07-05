@@ -27,13 +27,13 @@ test "Simple - default compression level":
 
 test "With context":
   var source = readFile("tests/files/gdp.json")
-  var cctx = new_compress_context()
+  var cctx = newCompressContext()
 
   var compressed = compress(cctx, source, level=3)
   var compressed_s = compress(cctx, readFile("tests/files/gdp.json"), level=3)
   discard free_context(cctx)
 
-  var dctx = new_decompress_context()
+  var dctx = newDecompressContext()
   var decompressed = decompress(dctx, compressed)
   var decompressed_s = decompress(dctx, readFile("tests/files/gdp.zst"))
   discard free_context(dctx)
@@ -46,12 +46,12 @@ test "With dict":
   var source = readFile("tests/files/gdp.json")
   var dict = readFile("tests/files/gdp.dict")
 
-  var cctx = new_compress_context()
+  var cctx = newCompressContext()
   var compressed = compress(cctx, source, dict, level=3)
   var compressed_s = compress(cctx, readFile("tests/files/gdp.json"), readFile("tests/files/gdp.dict"), level=3)
   discard free_context(cctx)
 
-  var dctx = new_decompress_context()
+  var dctx = newDecompressContext()
   var decompressed = decompress(dctx, compressed, dict)
   var decompressed_s = decompress(dctx, readFile("tests/files/gdp.zst"), readFile("tests/files/gdp.dict"))
   discard free_context(dctx)
@@ -86,7 +86,7 @@ test "Manual compress stream":
   for half_point in 0..10:  
     block: # explicit close
       var c_out_stream = newFileStream("tests/files/gdp-manual.json.zst", fmWrite)
-      var cmp_strm = new_compress_stream(c_out_stream, level=3)
+      var cmp_strm = newCompressStream(c_out_stream, level=3)
       let half = (original.len * half_point) div 10
       cmp_strm.compress(original[0..<half])
       cmp_strm.compress(original[half..^1])
@@ -107,7 +107,7 @@ test "Manual compress stream":
   block: # close via destructor
     var c_out_stream = newFileStream("tests/files/gdp-manual.json.zst", fmWrite)
     block:
-      var cmp_strm = new_compress_stream(c_out_stream, level=3)
+      var cmp_strm = newCompressStream(c_out_stream, level=3)
       cmp_strm.compress(original)
     c_out_stream.close()
 
@@ -124,7 +124,7 @@ test "Manual decompress stream":
   var compressed = readFile("tests/files/gdp.zst")
 
   block: # pull in uneven chunk sizes, explicit close
-    var dec_strm = new_decompress_stream(newStringStream(compressed))
+    var dec_strm = newDecompressStream(newStringStream(compressed))
     var cycled = ""
     var chunk = 1
     while not dec_strm.atEnd():
@@ -137,7 +137,7 @@ test "Manual decompress stream":
   block: # read past the end, close via destructor
     var cycled: seq[byte]
     block:
-      var dec_strm = new_decompress_stream(newStringStream(compressed))
+      var dec_strm = newDecompressStream(newStringStream(compressed))
       cycled = dec_strm.read(original.len * 2)
       check dec_strm.read(100).len == 0
     check cycled.len == original.len
@@ -160,7 +160,7 @@ test "Large synthetic data":
 
   block: # via CompressStream, in uneven chunks
     var c_out_stream = newFileStream("tests/files/synthetic.bin.zst", fmWrite)
-    var cmp_strm = new_compress_stream(c_out_stream, level=3)
+    var cmp_strm = newCompressStream(c_out_stream, level=3)
     var pos = 0
     var chunk = 1
     while pos < original.len:

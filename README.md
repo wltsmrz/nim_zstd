@@ -38,13 +38,13 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
 
   var source = readFile("tests/files/gdp.json")
 
-  var cctx = new_compress_context()
+  var cctx = newCompressContext()
   var compressed = compress(cctx, source, level=3)
-  discard free_context(cctx)
+  discard freeContext(cctx)
 
-  var dctx = new_decompress_context()
+  var dctx = newDecompressContext()
   var decompressed = decompress(dctx, compressed)
-  discard free_context(dctx)
+  discard freeContext(dctx)
 
   assert equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
@@ -59,13 +59,13 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
   var source = bytes(readFile("tests/files/gdp.json"))
   var dict = bytes(readFile("tests/files/gdp.dict"))
 
-  var cctx = new_compress_context()
+  var cctx = newCompressContext()
   var compressed = compress(cctx, source, dict, level=3)
-  discard free_context(cctx)
+  discard freeContext(cctx)
 
-  var dctx = new_decompress_context()
+  var dctx = newDecompressContext()
   var decompressed = decompress(dctx, compressed, dict)
-  discard free_context(dctx)
+  discard freeContext(dctx)
 
   assert equalmem(decompressed[0].addr, source[0].addr, source.len)
 ```
@@ -91,9 +91,31 @@ Uses a ZSTD context for setting options, using for multiple calls, etc.
   assert equalmem(cycled[0].addr, original[0].addr, original.len)
 ```
 
+**Manual streaming**
+
+For cases where the data isn't available all at once (or shouldn't be read all at once), `CompressStream` and `DecompressStream` give manual control over the streaming.
+
+```nim
+  var out_stream = newFileStream("data.zst", fmWrite)
+  var strm = newCompressStream(out_stream, level=3)
+  strm.compress("some data")            # string or openArray[byte],
+  strm.compress("some more data")       # chunks may have any size
+  strm.close()                          # optional, the destructor closes too
+  out_stream.close()
+```
+
+```nim
+  var strm = newDecompressStream(newFileStream("data.zst", fmRead))
+  while not strm.atEnd():
+    let chunk = strm.readStr(4096)
+    # ... process chunk ...
+  strm.close()                          # optional, the destructor closes too
+```
+
+Both only borrow the `Stream` they are given: closing (or dropping) them flushes and frees the zstd state, but the underlying stream stays open and is yours to close.
+
 # Compile flags
 
 `-d:useExternalZstd` to skip compiling with zstd and use system zstd instead (not default behavior)
 
 `-d:zstdPath=/home/zstd` specify path to custom zstd
-

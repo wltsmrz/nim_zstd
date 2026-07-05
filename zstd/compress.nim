@@ -31,17 +31,11 @@ proc ZSTD_initCStream*(a: ptr ZSTD_CStream, b: cint): csize_t {.c_dep_proc.}
 proc ZSTD_compressStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer, c: ptr ZSTD_inBuffer): csize_t {.c_dep_proc.}
 proc ZSTD_flushStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer): csize_t {.c_dep_proc.}
 proc ZSTD_endStream*(a: ptr ZSTD_CStream, b: ptr ZSTD_outBuffer): csize_t {.c_dep_proc.}
-# proc ZSTD_compressStream2*(a: ptr ZSTD_CCtx, b: ptr ZSTD_outBuffer, c: ptr ZSTD_inBuffer, d: ZSTD_EndDirective): csize_t {.importc: "ZSTD_compressStream2", header: "zstd.h".}
 
-proc new_compress_context*(): ptr ZSTD_CCtx =
+proc newCompressContext*(): ptr ZSTD_CCtx =
   ZSTD_createCCtx()
-proc free_context*(ctx: ptr ZSTD_CCtx): csize_t =
+proc freeContext*(ctx: ptr ZSTD_CCtx): csize_t =
   ZSTD_freeCCtx(ctx)
-
-proc new_compress_stream*(): ptr ZSTD_CStream =
-  ZSTD_createCStream()
-proc free_compress_stream*(strm: ptr ZSTD_CStream): csize_t =
-  ZSTD_freeCStream(strm)
 
 proc compress*(src: sink openArray[byte], level: int = 3): seq[byte] =
   let src_ptr = unsafeAddr(src[0])
@@ -114,7 +108,7 @@ when (NimMajor, NimMinor) >= (1, 6):
 else:
   proc `=`*(dest: var CompressStream, src: CompressStream) {.error.}
 
-proc new_compress_stream*(out_stream: Stream, level: int = 3): CompressStream =
+proc newCompressStream*(out_stream: Stream, level: int = 3): CompressStream =
   ## Creates a compression stream that compressed data can be added to
   ## manually using `compress`. Compressed output is written to `out_stream`.
   ## `close` finishes the frame; if it isn't called manually it is called by
@@ -147,7 +141,7 @@ proc compress*(strm: var CompressStream, src: string) {.inline.} =
 
 proc compress*(in_stream: Stream, out_stream: Stream, level: int = 3) =
   assert(not isNil(in_stream), "zstd compress in stream is nil")
-  var strm = new_compress_stream(out_stream, level)
+  var strm = newCompressStream(out_stream, level)
   var src_buf = newSeq[byte](ZSTD_CStreamInSize().int)
   while not in_stream.atEnd():
     let bytes_read = in_stream.readData(src_buf[0].addr, src_buf.len)
